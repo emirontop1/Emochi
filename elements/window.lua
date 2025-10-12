@@ -1,13 +1,11 @@
 --[[
-    Emochi UI Library - Window Element (GÜNCELLENMİŞ)
-    Bu modül, GUI'nin ana penceresini oluşturur ve yönetir.
-    Eklenen Özellikler:
-    1. Minimize/Restore butonu: Pencereyi sadece başlık çubuğu boyutuna küçültür/eski boyutuna getirir.
-    2. Maximize/Restore butonu: Pencereyi varsayılan boyutu ile büyük bir boyut arasında değiştirir.
-    3. Opsiyonel Key System: Belirlenen bir tuş ile pencereyi açıp kapatma.
-    4. Kapatma Butonu (Yeni): Pencereyi kalıcı olarak kapatır.
-    5. Saydamlık Parametresi (Yeni): Pencerenin genel saydamlığını ayarlar.
-    6. Mobil Giriş Engelleme: Mobil cihazlarda GUI etkileşimi sırasında kamera hareketini engeller.
+    Emochi UI Library - Window Element (FINAL VERSION)
+    This module creates and manages the main window element of the GUI.
+    Features included:
+    1. Minimize/Restore, Maximize/Restore, and Close buttons.
+    2. Optional Key System for toggling visibility (options.KeyCode).
+    3. Opacity Parameter (options.Opacity).
+    4. Mobile Input Blocking (Modal=true) to prevent camera movement/screen pan.
 ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -18,7 +16,7 @@ local CoreGui = game:GetService("CoreGui")
 local Window = {}
 Window.__index = Window
 
---// TEMA AYARLARI //--
+--// THEME SETTINGS //--
 local Themes = {
     Dark = {
         Background = Color3.fromRGB(35, 35, 45),
@@ -36,10 +34,10 @@ local Themes = {
     }
 }
 
--- Tweening için sabit ayarlar
+-- Tweening constants
 local TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 local BUTTON_SIZE = UDim2.fromOffset(40, 40)
-local LARGE_SIZE = UDim2.fromOffset(800, 600) -- Büyütme (Maximize) için kullanılacak hedef boyut
+local LARGE_SIZE = UDim2.fromOffset(800, 600) -- Target size for Maximize
 
 function Window:Create(options)
     options = options or {}
@@ -47,8 +45,8 @@ function Window:Create(options)
     local subTitle = options.SubTitle or "Version " .. (getfenv(0).Emochi and getfenv(0).Emochi.Ver or "1.0")
     local size = options.Size or UDim2.fromOffset(580, 460)
     local themeName = options.Theme or "Dark"
-    local toggleKey = options.KeyCode -- Opsiyonel tuş kodu
-    local opacity = options.Opacity or 0 -- Yeni Saydamlık parametresi (0 = Tamamen opak)
+    local toggleKey = options.KeyCode -- Optional key code
+    local opacity = options.Opacity or 0 -- New Opacity parameter (0 = fully opaque)
     local selectedTheme = Themes[themeName] or Themes.Dark
 
     local windowObject = setmetatable({}, Window)
@@ -57,7 +55,7 @@ function Window:Create(options)
     windowObject.ScreenGui.Name = "Emochi_Window_Root"
     windowObject.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     windowObject.ScreenGui.ResetOnSpawn = false
-    -- Mobil cihazlarda UI'ya tıklandığında kamera hareketini engellemek için eklendi.
+    -- Crucial for mobile: Prevents camera movement/screen pan when interacting with the GUI.
     windowObject.ScreenGui.Modal = true 
 
     local MainFrame = Instance.new("Frame")
@@ -66,7 +64,7 @@ function Window:Create(options)
     MainFrame.Position = UDim2.fromScale(0.5, 0.5)
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.BackgroundColor3 = selectedTheme.Background
-    MainFrame.BackgroundTransparency = opacity -- Saydamlık uygulandı
+    MainFrame.BackgroundTransparency = opacity -- Opacity applied
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = windowObject.ScreenGui
     
@@ -83,7 +81,7 @@ function Window:Create(options)
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 40)
     Header.BackgroundColor3 = selectedTheme.Header
-    Header.BackgroundTransparency = opacity -- Saydamlık uygulandı
+    Header.BackgroundTransparency = opacity -- Opacity applied
     Header.BorderSizePixel = 0
     Header.Parent = MainFrame
     
@@ -93,7 +91,7 @@ function Window:Create(options)
     
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Name = "TitleLabel"
-    -- Üç buton (40x3=120) ve biraz boşluk için 130px ayarlandı
+    -- Space for 3 buttons (120px) + margin
     TitleLabel.Size = UDim2.new(1, -130, 1, 0)
     TitleLabel.Position = UDim2.fromOffset(10, 0)
     TitleLabel.BackgroundTransparency = 1
@@ -106,7 +104,8 @@ function Window:Create(options)
     local SubTitleLabel = Instance.new("TextLabel")
     SubTitleLabel.Name = "SubTitleLabel"
     SubTitleLabel.Size = UDim2.new(1, -130, 1, 0)
-    SubTitleLabel.Position = UDim2.fromOffset(TitleLabel.TextBounds.X + 15, 0)
+    -- This position calculation might need refinement based on font, but is set relative to Title
+    SubTitleLabel.Position = UDim2.fromOffset(150, 0) 
     SubTitleLabel.BackgroundTransparency = 1
     SubTitleLabel.Font = Enum.Font.Gotham
     SubTitleLabel.TextColor3 = selectedTheme.Accent
@@ -121,9 +120,9 @@ function Window:Create(options)
     windowObject.Container.BackgroundTransparency = 1
     windowObject.Container.Parent = MainFrame
 
-    --// YENİ EKLEMELER //--
+    --// NEW FEATURES (Minimize, Maximize, Close, Opacity, KeySystem) //--
 
-    -- Pencerenin başlangıç boyutunu ve konumunu sakla
+    -- Store initial size and state
     windowObject.InitialSize = size
     windowObject.InitialPosition = MainFrame.Position
     windowObject.IsMinimized = false
@@ -131,21 +130,21 @@ function Window:Create(options)
 
     local function setSizeAndPosition(newSize, newPos)
         TweenService:Create(MainFrame, TWEEN_INFO, {Size = newSize, Position = newPos}):Play()
-        -- Pencere yüksekliği 40'dan büyükse içeriği göster (Başlık çubuğunun yüksekliği)
+        -- Only show content if window height is greater than header height
         windowObject.Container.Visible = (newSize.Y.Offset > 40)
     end
 
-    -- Kapatma Butonu (X) -- En sağda (40px)
+    -- 1. Close Button (X) -- Far right (40px)
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "CloseButton"
     CloseButton.Size = BUTTON_SIZE
-    CloseButton.Position = UDim2.new(1, -40, 0, 0) -- Sağdan 40px
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60) -- Kırmızı renk
-    CloseButton.BackgroundTransparency = opacity -- Saydamlık uygulandı
+    CloseButton.Position = UDim2.new(1, -40, 0, 0)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60) 
+    CloseButton.BackgroundTransparency = opacity
     CloseButton.Text = "X"
     CloseButton.Font = Enum.Font.Gotham
     CloseButton.TextSize = 20
-    CloseButton.TextColor3 = Color3.new(1, 1, 1) -- Beyaz metin
+    CloseButton.TextColor3 = Color3.new(1, 1, 1)
     CloseButton.Parent = Header
 
     local CloseCorner = Instance.new("UICorner")
@@ -153,17 +152,17 @@ function Window:Create(options)
     CloseCorner.Parent = CloseButton
 
     CloseButton.MouseButton1Click:Connect(function()
-        -- ScreenGui'yi yok ederek pencereyi tamamen kapat
+        -- Destroy the ScreenGui to close the window completely
         windowObject.ScreenGui:Destroy()
     end)
 
-    -- 1. Minimize/Restore Butonu (Küçültme) -- Ortada (80px)
+    -- 2. Minimize/Restore Button (—) -- Middle (80px)
     local MinimizeButton = Instance.new("TextButton")
     MinimizeButton.Name = "MinimizeButton"
     MinimizeButton.Size = BUTTON_SIZE
-    MinimizeButton.Position = UDim2.new(1, -80, 0, 0) -- Sağdan 80px
+    MinimizeButton.Position = UDim2.new(1, -80, 0, 0) 
     MinimizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    MinimizeButton.BackgroundTransparency = opacity -- Saydamlık uygulandı
+    MinimizeButton.BackgroundTransparency = opacity
     MinimizeButton.Text = "—"
     MinimizeButton.Font = Enum.Font.Gotham
     MinimizeButton.TextSize = 20
@@ -176,27 +175,28 @@ function Window:Create(options)
     
     MinimizeButton.MouseButton1Click:Connect(function()
         if not windowObject.IsMinimized then
-            -- Küçült: Sadece başlık çubuğu yüksekliğine indir
+            -- Minimize: Shrink to header height
             windowObject.IsMinimized = true
             setSizeAndPosition(UDim2.new(MainFrame.Size.X.Scale, MainFrame.Size.X.Offset, 0, 40), MainFrame.Position)
         else
-            -- Geri Yükle: Başlangıç boyutuna dön
+            -- Restore: Return to initial size
             windowObject.IsMinimized = false
             setSizeAndPosition(windowObject.InitialSize, windowObject.InitialPosition)
         end
-        -- Minimize/Restore yapıldığında Maximize durumunu resetle
+        -- Reset Maximize state upon Minimize/Restore
         windowObject.IsMaximized = false
+        MaximizeButton.Text = "☐" 
     end)
 
 
-    -- 2. Maximize/Restore Butonu (Büyütme) -- En solda (120px)
+    -- 3. Maximize/Restore Button (☐) -- Leftmost (120px)
     local MaximizeButton = Instance.new("TextButton")
     MaximizeButton.Name = "MaximizeButton"
     MaximizeButton.Size = BUTTON_SIZE
-    MaximizeButton.Position = UDim2.new(1, -120, 0, 0) -- Sağdan 120px
+    MaximizeButton.Position = UDim2.new(1, -120, 0, 0)
     MaximizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    MaximizeButton.BackgroundTransparency = opacity -- Saydamlık uygulandı
-    MaximizeButton.Text = "☐" -- Kare sembolü (Maximize)
+    MaximizeButton.BackgroundTransparency = opacity
+    MaximizeButton.Text = "☐" -- Square symbol (Maximize)
     MaximizeButton.Font = Enum.Font.Gotham
     MaximizeButton.TextSize = 20
     MaximizeButton.TextColor3 = selectedTheme.Text
@@ -207,7 +207,7 @@ function Window:Create(options)
     MaxCorner.Parent = MaximizeButton
     
     MaximizeButton.MouseButton1Click:Connect(function()
-        -- Eğer minimize edilmişse, öncelikle eski boyutuna getir
+        -- If minimized, restore it first
         if windowObject.IsMinimized then
             windowObject.IsMinimized = false
             setSizeAndPosition(windowObject.InitialSize, windowObject.InitialPosition)
@@ -215,37 +215,38 @@ function Window:Create(options)
         end
 
         if not windowObject.IsMaximized then
-            -- Büyüt: Daha büyük bir boyuta ve merkeze taşı
+            -- Maximize: Move to center and set large size
             windowObject.IsMaximized = true
             setSizeAndPosition(LARGE_SIZE, UDim2.fromScale(0.5, 0.5))
-            MaximizeButton.Text = "⇆" -- Restore sembolü
+            MaximizeButton.Text = "⇆" -- Restore symbol
         else
-            -- Geri Yükle: Başlangıç boyutuna dön
+            -- Restore: Return to initial size
             windowObject.IsMaximized = false
             setSizeAndPosition(windowObject.InitialSize, windowObject.InitialPosition)
-            MaximizeButton.Text = "☐" -- Maximize sembolü
+            MaximizeButton.Text = "☐" -- Maximize symbol
         end
     end)
     
-    -- 3. Keysystem (Opsiyonel Tuş Sistemi)
+    -- 4. Keysystem (Optional Key System)
     if toggleKey and typeof(toggleKey) == "EnumItem" then
-        windowObject.ScreenGui.Enabled = false -- KeyCode varsa başlangıçta görünmez
+        windowObject.ScreenGui.Enabled = false -- Hidden by default if KeyCode is provided
         
-        -- Kullanım amacını değiştirmemek için ScreenGui.Enabled durumunu kontrol eder
+        -- Controls ScreenGui.Enabled state
         UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if not gameProcessed and input.KeyCode == toggleKey then
                 windowObject.ScreenGui.Enabled = not windowObject.ScreenGui.Enabled
             end
         end)
     else
-        windowObject.ScreenGui.Enabled = true -- KeyCode yoksa başlangıçta görünür
+        windowObject.ScreenGui.Enabled = true -- Visible by default if no KeyCode is provided
     end
 
-    -- Draggable Logic (Mevcut sürükleme mantığı)
+    -- Draggable Logic (Existing drag logic)
     local dragging = false
     local dragInput, dragStart, startPosition
     
     Header.InputBegan:Connect(function(input)
+        -- Only start dragging on left click or touch
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -277,5 +278,5 @@ function Window:Create(options)
 end
 
 
--- Modülü döndür
+-- Return the module table (this is essential for the require() function)
 return Window
