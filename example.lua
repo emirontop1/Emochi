@@ -3,7 +3,7 @@ local Emochi = loadstring(game:HttpGet("https://raw.githubusercontent.com/emiron
 
 -- Kütüphane başarıyla yüklendiyse pencereyi oluştur
 if Emochi then
-    local MyWindow = WindowModule:Create({
+    local MyWindow = Emochi:Create({
         Title = "Geliştirici Paneli",
         SubTitle = "Versiyon Beta 1.2",
         
