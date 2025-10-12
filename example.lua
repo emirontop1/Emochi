@@ -3,13 +3,22 @@ local Emochi = loadstring(game:HttpGet("https://raw.githubusercontent.com/emiron
 
 -- Kütüphane başarıyla yüklendiyse pencereyi oluştur
 if Emochi then
-    local Window1 = Emochi.Window:Create({
-        Title = "İsim Kısmı", 
-        SubTitle ="By Emir | v" .. Emochi.Ver,
-        Theme = "Dark", -- "Dark" veya "Light" olabilir
-        Size = UDim2.fromOffset(580, 460)
+    local MyWindow = WindowModule:Create({
+        Title = "Geliştirici Paneli",
+        SubTitle = "Versiyon Beta 1.2",
         
-        -- KeySystem notu: İstediğin KeySystem mantığını loader.lua'nın en başına,
-        -- elementleri yüklemeden önce eklemen daha doğru olur.
+        -- Pencerenin başlangıç boyutu
+        Size = UDim2.fromOffset(650, 500),
+        
+        -- Kullanılacak tema
+        Theme = "Dark",
+        
+        -- Saydamlık ayarı (0 = Opak, 1 = Tamamen Şeffaf)
+        Opacity = 0.15, 
+        
+        -- Opsiyonel: Pencereyi açıp kapatmak için tuş sistemi
+        -- Bu örnekte F2 tuşu ayarlanmıştır. Tuş atanmazsa pencere varsayılan olarak açık başlar.
+        KeyCode = Enum.KeyCode.F2 
     })
+
 end
