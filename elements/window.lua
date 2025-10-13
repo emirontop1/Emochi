@@ -1,11 +1,30 @@
 --[[
     Emochi UI Library - Window Element (FINAL VERSION)
-    HATA DÜZELTMESİ: Kütüphane yüklenirken çökmesine neden olan "getfenv" satırı kaldırıldı.
+    HATA DÜZELTMESİ: 'ScreenGui.Modal' kaldırıldı. TweenService nil hatası düzeltildi.
 ]]
 
+-- Güvenli Servis Çağrıları (game:GetService'in nil dönme ihtimaline karşı)
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
+
+-- TweenService değişkenini tanımla, ancak sadece var ise kullan
+local TweenService
+local TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local CanUseTween = false
+
+-- TweenService'ı güvenli bir şekilde çağırmayı dene
+local success, service = pcall(function()
+    return game:GetService("TweenService")
+end)
+
+if success and service and service:IsA("TweenService") then
+    TweenService = service
+    CanUseTween = true
+    print("Emochi UI | TweenService başarıyla yüklendi.")
+else
+    -- Eğer TweenService yoksa, uyarı ver ve geçici olarak kullanımı engelle
+    warn("Emochi UI | TweenService kullanılamıyor. Animasyonlar devre dışı.")
+end
 
 -- Ana modül tablosu
 local Window = {}
@@ -30,14 +49,12 @@ local Themes = {
 }
 
 -- Tweening constants
-local TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 local BUTTON_SIZE = UDim2.fromOffset(40, 40)
 local LARGE_SIZE = UDim2.fromOffset(800, 600) -- Target size for Maximize
 
 function Window:Create(options)
     options = options or {}
     local title = options.Title or "Emochi UI"
-    -- KESİN DÜZELTME: Bu satır hataya neden oluyordu, basitleştirildi.
     local subTitle = options.SubTitle or "Version 1.2"
     local size = options.Size or UDim2.fromOffset(580, 460)
     local themeName = options.Theme or "Dark"
@@ -52,12 +69,7 @@ function Window:Create(options)
     windowObject.ScreenGui.Name = "Emochi_Window_Root"
     windowObject.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     windowObject.ScreenGui.ResetOnSpawn = false
-    -- HATA DÜZELTME: ScreenGui'nin 'Modal' özelliği yoktur. Bu satır kaldırıldı.
-    -- Bu özellik, eğer gerekliyse, ana çerçeveye (MainFrame) uygulanmalıdır.
-    -- Ancak bir Frame'in de Modal özelliği yoktur. Genellikle bunu ScreenGui'nin 'IgnoreGuiInset' özelliği veya
-    -- arkaplana Frame ekleyerek MouseButton1Down event'i ile sağlarsınız.
-    
-    -- windowObject.ScreenGui.Modal = isModal // KIRAN SATIRDI. ARTIK YOK.
+    -- Hata Düzeltme 1: ScreenGui.Modal kaldırıldı.
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
@@ -131,8 +143,15 @@ function Window:Create(options)
     windowObject.IsMinimized = false
     windowObject.IsMaximized = false
 
+    -- Hata Düzeltme 2: TweenService kullanılmadan önce kontrol ediliyor.
     local function setSizeAndPosition(newSize, newPos)
-        TweenService:Create(MainFrame, TWEEN_INFO, {Size = newSize, Position = newPos}):Play()
+        if CanUseTween then
+            TweenService:Create(MainFrame, TWEEN_INFO, {Size = newSize, Position = newPos}):Play()
+        else
+            -- Animasyon kullanılamıyorsa pozisyonu anında ayarla
+            MainFrame.Size = newSize
+            MainFrame.Position = newPos
+        end
         windowObject.Container.Visible = (newSize.Y.Offset > 40)
     end
 
