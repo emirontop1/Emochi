@@ -1,6 +1,5 @@
 --[[
     Emochi UI Library - Window Element (FINAL VERSION)
-    This module creates and manages the main window element of the GUI.
     HATA DÜZELTMESİ: Kütüphane yüklenirken çökmesine neden olan "getfenv" satırı kaldırıldı.
 ]]
 
@@ -38,7 +37,7 @@ local LARGE_SIZE = UDim2.fromOffset(800, 600) -- Target size for Maximize
 function Window:Create(options)
     options = options or {}
     local title = options.Title or "Emochi UI"
-    -- DÜZELTME: Bu satır hataya neden oluyordu, basitleştirildi.
+    -- KESİN DÜZELTME: Bu satır hataya neden oluyordu, basitleştirildi.
     local subTitle = options.SubTitle or "Version 1.2"
     local size = options.Size or UDim2.fromOffset(580, 460)
     local themeName = options.Theme or "Dark"
@@ -247,7 +246,7 @@ function Window:Create(options)
     end)
     
     UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.Touch then
             if dragging then
                 local delta = input.Position - dragStart
                 MainFrame.Position = UDim2.new(
