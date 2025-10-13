@@ -29,7 +29,7 @@ local LOAD_URL = string.format(BASE_URL, GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH
 
 -- Yüklenmesini istediğin tüm elementlerin isimleri
 local ElementsToLoad = {
-    "Window"
+    "window"
     -- Gelecekte buraya "Button", "Tab", "Toggle" gibi yeni elementleri ekleyeceksin
 }
 
@@ -37,8 +37,8 @@ print("Emochi UI | Yükleme Başlatıldı...")
 
 -- Elementleri döngü ile yükle
 for _, elementName in ipairs(ElementsToLoad) do
-    local url = LOAD_URL .. elementName:lower() .. ".lua" -- Dosya adları küçük harfle (window.lua)
-    
+    local url = LOAD_URL .. elementName .. ".lua" -- Dosya adları büyük/küçük harf fark etmeksizin olduğu gibi kullanılır
+	
     local success, response = pcall(function()
         local elementCode = game:HttpGet(url)
         local elementModule = loadstring(elementCode)()
