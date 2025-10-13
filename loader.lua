@@ -1,70 +1,65 @@
---[[
-    Emochi UI Library - Loader
-    Yazar: Emir (ve Gemini)
-    Versiyon: 1.0
+-- Emochi UI Library - Loader (Düzeltilmiş)
 
-    Bu betik, kütüphanenin diğer tüm parçalarını GitHub deposundan yükler
-    ve tek bir tablo (library) içinde birleştirir.
-]]
-
--- Eğer başka bir script tarafından zaten yüklendiyse tekrar yüklemeyi engelle
+-- Eğer zaten yüklüyse tekrar yükleme
 if game:GetService("CoreGui"):FindFirstChild("Emochi_GUI_HOLDER") then
-    return require(game:GetService("CoreGui").Emochi_GUI_HOLDER)
+    local existing = require(game:GetService("CoreGui").Emochi_GUI_HOLDER)
+    return existing
 end
 
--- Ana kütüphane tablosunu oluştur
 local Emochi = {
     Ver = "1.0",
     Elements = {}
 }
 
---// GITHUB AYARLARI //--
-local GITHUB_USER = "emirontop1" -- DEĞİŞTİRİLDİ
-local GITHUB_REPO = "Ligma"      -- DEĞİŞTİRİLDİ
+local GITHUB_USER = "emirontop1"
+local GITHUB_REPO = "Ligma"
 local GITHUB_BRANCH = "main"
 
--- Elementlerin bulunduğu temel URL
 local BASE_URL = "https://raw.githubusercontent.com/%s/%s/%s/elements/"
 local LOAD_URL = string.format(BASE_URL, GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH)
 
--- Yüklenmesini istediğin tüm elementlerin isimleri
 local ElementsToLoad = {
-    "window"
-    -- Gelecekte buraya "Button", "Tab", "Toggle" gibi yeni elementleri ekleyeceksin
+    "window"  -- Dosya küçük harfle burada da
 }
 
 print("Emochi UI | Yükleme Başlatıldı...")
 
--- Elementleri döngü ile yükle
 for _, elementName in ipairs(ElementsToLoad) do
-    local url = LOAD_URL .. elementName .. ".lua" -- Dosya adları büyük/küçük harf fark etmeksizin olduğu gibi kullanılır
-	
-    local success, response = pcall(function()
+    local url = LOAD_URL .. elementName .. ".lua"
+    print("Emochi UI | Deneniyor: " .. url)
+    
+    local success, responseOrError = pcall(function()
         local elementCode = game:HttpGet(url)
+        assert(type(elementCode) == "string", "Kod string değil")
+        print("Emochi UI | Kod indirildi (ilk 100 karakter): " .. elementCode:sub(1, 100))
+        
         local elementModule = loadstring(elementCode)()
+        print("Emochi UI | elementModule tipi: " .. tostring(type(elementModule)))
+        
+        if not elementModule then
+            error("elementModule nil döndü: " .. url)
+        end
+        
         Emochi[elementName] = elementModule
     end)
-
+    
     if success then
         print(string.format("Emochi UI | '%s' elementi başarıyla yüklendi.", elementName))
     else
-        warn(string.format("Emochi UI | '%s' elementi yüklenemedi! Repo'da dosyanın olduğundan emin ol. Hata: %s", elementName, tostring(response)))
+        warn(string.format("Emochi UI | '%s' elementi yüklenemedi! Hata: %s", elementName, tostring(responseOrError)))
         return nil
     end
 end
 
 print("Emochi UI | Tüm elementler yüklendi. Kütüphane hazır.")
 
--- Kütüphanenin tekrar yüklenmesini engellemek için bir modül oluşturup sakla
 local Module = Instance.new("ModuleScript", game:GetService("CoreGui"))
 Module.Name = "Emochi_GUI_HOLDER"
-script.Parent = Module 
--- Bu modülün asıl amacı require ile kütüphaneyi tekrar alabilmek.
+script.Parent = Module
 
--- Yüklü kütüphaneyi döndür
 return setmetatable(Emochi, {
-	__index = Emochi.Elements,
-	__newindex = function(t, k, v)
-		Emochi.Elements[k] = v
-	end
+    __index = Emochi.Elements,
+    __newindex = function(t, k, v)
+        Emochi.Elements[k] = v
+    end
 })
