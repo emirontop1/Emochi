@@ -1,18 +1,17 @@
 --[[
-    Emochi UI Library - Window Element (FINAL VERSION)
-    HATA DÜZELTMESİ: 'ScreenGui.Modal' kaldırıldı. TweenService nil hatası düzeltildi.
+    Emochi UI Library - Window Element (Rewrite & Stabilized)
+    
+    Bu dosya, önceki tüm hataları (TweenService nil, ScreenGui.Modal) düzeltir
+    ve orijinal Emochi UI özelliklerini (Opacity, Minimize/Maximize, KeyCode, Dragging) korur.
 ]]
 
--- Güvenli Servis Çağrıları (game:GetService'in nil dönme ihtimaline karşı)
+-- Gerekli Servisler
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
--- TweenService değişkenini tanımla, ancak sadece var ise kullan
+-- TweenService'ı güvenli bir şekilde almayı dene (Önceki hatayı düzeltir)
 local TweenService
-local TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 local CanUseTween = false
-
--- TweenService'ı güvenli bir şekilde çağırmayı dene
 local success, service = pcall(function()
     return game:GetService("TweenService")
 end)
@@ -20,11 +19,12 @@ end)
 if success and service and service:IsA("TweenService") then
     TweenService = service
     CanUseTween = true
-    print("Emochi UI | TweenService başarıyla yüklendi.")
-else
-    -- Eğer TweenService yoksa, uyarı ver ve geçici olarak kullanımı engelle
-    warn("Emochi UI | TweenService kullanılamıyor. Animasyonlar devre dışı.")
 end
+
+-- Tweening sabitleri (TweenService bulunamasa bile tanımlı kalır)
+local TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local BUTTON_SIZE = UDim2.fromOffset(40, 40)
+local MAXIMIZE_SIZE = UDim2.fromScale(0.9, 0.9) -- Ekranın %90'ı büyüklüğünde
 
 -- Ana modül tablosu
 local Window = {}
@@ -38,38 +38,26 @@ local Themes = {
         Text = Color3.fromRGB(255, 255, 255),
         Accent = Color3.fromRGB(80, 120, 255),
         Outline = Color3.fromRGB(60, 60, 70)
-    },
-    Light = {
-        Background = Color3.fromRGB(240, 240, 240),
-        Header = Color3.fromRGB(255, 255, 255),
-        Text = Color3.fromRGB(20, 20, 20),
-        Accent = Color3.fromRGB(0, 120, 255),
-        Outline = Color3.fromRGB(200, 200, 200)
     }
 }
-
--- Tweening constants
-local BUTTON_SIZE = UDim2.fromOffset(40, 40)
-local LARGE_SIZE = UDim2.fromOffset(800, 600) -- Target size for Maximize
 
 function Window:Create(options)
     options = options or {}
     local title = options.Title or "Emochi UI"
-    local subTitle = options.SubTitle or "Version 1.2"
+    local subTitle = options.SubTitle or "Version 1.4"
     local size = options.Size or UDim2.fromOffset(580, 460)
-    local themeName = options.Theme or "Dark"
-    local toggleKey = options.KeyCode or options.Key -- Opsiyonel: Hem KeyCode hem Key desteklensin
-    local opacity = options.Opacity or 0 -- Opacity parameter (0 = fully opaque)
-    local isModal = options.Modal ~= false 
-    local selectedTheme = Themes[themeName] or Themes.Dark
+    local toggleKey = options.KeyCode or Enum.KeyCode.F2 -- Varsayılan F2
+    local opacity = options.Opacity or 0 -- 0 = tamamen opak (tam görünür)
+
+    local selectedTheme = Themes[options.Theme or "Dark"] or Themes.Dark
 
     local windowObject = setmetatable({}, Window)
 
+    -- ScreenGui (Modal özelliği kaldırıldı)
     windowObject.ScreenGui = Instance.new("ScreenGui")
     windowObject.ScreenGui.Name = "Emochi_Window_Root"
     windowObject.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     windowObject.ScreenGui.ResetOnSpawn = false
-    -- Hata Düzeltme 1: ScreenGui.Modal kaldırıldı.
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
@@ -77,7 +65,7 @@ function Window:Create(options)
     MainFrame.Position = UDim2.fromScale(0.5, 0.5)
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.BackgroundColor3 = selectedTheme.Background
-    MainFrame.BackgroundTransparency = opacity -- Opacity applied
+    MainFrame.BackgroundTransparency = opacity
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = windowObject.ScreenGui
     
@@ -90,13 +78,14 @@ function Window:Create(options)
     Stroke.Thickness = 1
     Stroke.Parent = MainFrame
 
+    -- Header (Başlık Çubuğu)
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 40)
     Header.BackgroundColor3 = selectedTheme.Header
-    Header.BackgroundTransparency = opacity -- Opacity applied
+    Header.BackgroundTransparency = opacity
     Header.BorderSizePixel = 0
-    Header.Active = true 
+    Header.Active = true -- Sürükleme için aktif
     Header.Parent = MainFrame
     
     local HeaderCorner = Instance.new("UICorner")
@@ -109,28 +98,27 @@ function Window:Create(options)
     TitleLabel.Position = UDim2.fromOffset(10, 0)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextSize = 16
     TitleLabel.TextColor3 = selectedTheme.Text
     TitleLabel.Text = title
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.ZIndex = Header.ZIndex + 1 
-    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.TextWrapped = true
     TitleLabel.Parent = Header
 
     local SubTitleLabel = Instance.new("TextLabel")
     SubTitleLabel.Name = "SubTitleLabel"
     SubTitleLabel.Size = UDim2.new(1, -130, 1, 0)
-    SubTitleLabel.Position = UDim2.fromOffset(150, 0) 
+    SubTitleLabel.Position = UDim2.fromOffset(10 + 100, 0)  
     SubTitleLabel.BackgroundTransparency = 1
     SubTitleLabel.Font = Enum.Font.Gotham
+    SubTitleLabel.TextSize = 14
     SubTitleLabel.TextColor3 = selectedTheme.Accent
     SubTitleLabel.Text = subTitle
     SubTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SubTitleLabel.ZIndex = Header.ZIndex + 1
-    SubTitleLabel.BackgroundTransparency = 1
+    SubTitleLabel.TextWrapped = true
     SubTitleLabel.Parent = Header
 
-    local buttonZIndex = Header.ZIndex + 2
-
+    -- İçerik Konteyneri
     windowObject.Container = Instance.new("Frame")
     windowObject.Container.Name = "Container"
     windowObject.Container.Size = UDim2.new(1, -20, 1, -50)
@@ -142,60 +130,59 @@ function Window:Create(options)
     windowObject.InitialPosition = MainFrame.Position
     windowObject.IsMinimized = false
     windowObject.IsMaximized = false
+    windowObject.IsShown = false -- Başlangıçta gizli keycode varsa
 
-    -- Hata Düzeltme 2: TweenService kullanılmadan önce kontrol ediliyor.
+    -- Hata önleyici setSizeAndPosition fonksiyonu
     local function setSizeAndPosition(newSize, newPos)
-        if CanUseTween then
-            TweenService:Create(MainFrame, TWEEN_INFO, {Size = newSize, Position = newPos}):Play()
+        if CanUseTween and TweenService then
+            -- TweenService varsa animasyon yap
+            local tween = TweenService:Create(MainFrame, TWEEN_INFO, {Size = newSize, Position = newPos})
+            pcall(function() tween:Play() end) -- Play'de çökme ihtimaline karşı pcall
         else
-            -- Animasyon kullanılamıyorsa pozisyonu anında ayarla
+            -- TweenService yoksa anında ayarla (Çökme önleme)
             MainFrame.Size = newSize
             MainFrame.Position = newPos
         end
         windowObject.Container.Visible = (newSize.Y.Offset > 40)
     end
 
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Name = "CloseButton"
-    CloseButton.Size = BUTTON_SIZE
-    CloseButton.Position = UDim2.new(1, -40, 0, 0)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60) 
-    CloseButton.BackgroundTransparency = opacity
-    CloseButton.Text = "X"
-    CloseButton.Font = Enum.Font.Gotham
-    CloseButton.TextSize = 20
-    CloseButton.TextColor3 = Color3.new(1, 1, 1)
-    CloseButton.ZIndex = buttonZIndex
-    CloseButton.Parent = Header
-
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 4)
-    CloseCorner.Parent = CloseButton
-
+    -- Buton Oluşturucu Fonksiyon
+    local function createButton(name, color, text, position)
+        local Button = Instance.new("TextButton")
+        Button.Name = name
+        Button.Size = BUTTON_SIZE
+        Button.Position = position
+        Button.BackgroundColor3 = color
+        Button.BackgroundTransparency = opacity
+        Button.Text = text
+        Button.Font = Enum.Font.Gotham
+        Button.TextSize = 20
+        Button.TextColor3 = selectedTheme.Text
+        Button.ZIndex = Header.ZIndex + 2
+        Button.Parent = Header
+        
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 4)
+        Corner.Parent = Button
+        
+        return Button
+    end
+    
+    local CloseButton = createButton("CloseButton", Color3.fromRGB(200, 60, 60), "X", UDim2.new(1, -40, 0, 0))
     CloseButton.MouseButton1Click:Connect(function()
         windowObject.ScreenGui:Destroy()
+        -- Global tablo temizliği ekle
+        if shared.Emochi_UI_Loaded then
+            shared.Emochi_UI_Loaded = nil
+        end
     end)
 
-    local MinimizeButton = Instance.new("TextButton")
-    MinimizeButton.Name = "MinimizeButton"
-    MinimizeButton.Size = BUTTON_SIZE
-    MinimizeButton.Position = UDim2.new(1, -80, 0, 0) 
-    MinimizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    MinimizeButton.BackgroundTransparency = opacity
-    MinimizeButton.Text = "—"
-    MinimizeButton.Font = Enum.Font.Gotham
-    MinimizeButton.TextSize = 20
-    MinimizeButton.TextColor3 = selectedTheme.Text
-    MinimizeButton.ZIndex = buttonZIndex
-    MinimizeButton.Parent = Header
-
-    local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 4)
-    MinCorner.Parent = MinimizeButton
+    local MinimizeButton = createButton("MinimizeButton", Color3.fromRGB(80, 80, 90), "—", UDim2.new(1, -80, 0, 0))
     
     MinimizeButton.MouseButton1Click:Connect(function()
         if not windowObject.IsMinimized then
             windowObject.IsMinimized = true
+            -- Yüksekliği sadece başlık çubuğu kadar yap
             setSizeAndPosition(UDim2.new(MainFrame.Size.X.Scale, MainFrame.Size.X.Offset, 0, 40), MainFrame.Position)
         else
             windowObject.IsMinimized = false
@@ -205,22 +192,7 @@ function Window:Create(options)
         MaximizeButton.Text = "☐" 
     end)
 
-    local MaximizeButton = Instance.new("TextButton")
-    MaximizeButton.Name = "MaximizeButton"
-    MaximizeButton.Size = BUTTON_SIZE
-    MaximizeButton.Position = UDim2.new(1, -120, 0, 0)
-    MaximizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    MaximizeButton.BackgroundTransparency = opacity
-    MaximizeButton.Text = "☐"
-    MaximizeButton.Font = Enum.Font.Gotham
-    MaximizeButton.TextSize = 20
-    MaximizeButton.TextColor3 = selectedTheme.Text
-    MaximizeButton.ZIndex = buttonZIndex
-    MaximizeButton.Parent = Header
-
-    local MaxCorner = Instance.new("UICorner")
-    MaxCorner.CornerRadius = UDim.new(0, 4)
-    MaxCorner.Parent = MaximizeButton
+    local MaximizeButton = createButton("MaximizeButton", Color3.fromRGB(80, 80, 90), "☐", UDim2.new(1, -120, 0, 0))
     
     MaximizeButton.MouseButton1Click:Connect(function()
         if windowObject.IsMinimized then
@@ -231,7 +203,8 @@ function Window:Create(options)
 
         if not windowObject.IsMaximized then
             windowObject.IsMaximized = true
-            setSizeAndPosition(LARGE_SIZE, UDim2.fromScale(0.5, 0.5))
+            -- Pozisyonu ekranın ortasına ayarla
+            setSizeAndPosition(MAXIMIZE_SIZE, UDim2.fromScale(0.5, 0.5))
             MaximizeButton.Text = "⇆"
         else
             windowObject.IsMaximized = false
@@ -240,26 +213,34 @@ function Window:Create(options)
         end
     end)
     
+    -- Pencereyi açıp kapatmak için tuş sistemi
     if toggleKey and typeof(toggleKey) == "EnumItem" then
         windowObject.ScreenGui.Enabled = false
+        windowObject.IsShown = false
         
         UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if not gameProcessed and input.KeyCode == toggleKey then
                 windowObject.ScreenGui.Enabled = not windowObject.ScreenGui.Enabled
+                windowObject.IsShown = windowObject.ScreenGui.Enabled
             end
         end)
     else
+        -- Keycode yoksa her zaman açık
         windowObject.ScreenGui.Enabled = true
+        windowObject.IsShown = true
     end
 
+    -- Pencere Sürükleme Mantığı
     local dragging = false
     local dragStart, startPosition
     
     Header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPosition = MainFrame.Position
+            if not windowObject.IsMaximized and not windowObject.IsMinimized and windowObject.IsShown then
+                dragging = true
+                dragStart = input.Position
+                startPosition = MainFrame.Position
+            end
         end
     end)
     
@@ -273,10 +254,19 @@ function Window:Create(options)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.Touch then
             if dragging then
                 local delta = input.Position - dragStart
-                MainFrame.Position = UDim2.new(
-                    startPosition.X.Scale, startPosition.X.Offset + delta.X,
-                    startPosition.Y.Scale, startPosition.Y.Offset + delta.Y
-                )
+                local newX = startPosition.X.Offset + delta.X
+                local newY = startPosition.Y.Offset + delta.Y
+                
+                -- Ekran sınırları içinde kalmasını sağla (Taşmayı önler)
+                local maxX = MainFrame.Parent.AbsoluteSize.X - MainFrame.AbsoluteSize.X
+                local maxY = MainFrame.Parent.AbsoluteSize.Y - MainFrame.AbsoluteSize.Y
+                
+                newX = math.max(0, math.min(newX, maxX))
+                newY = math.max(0, math.min(newY, maxY))
+                
+                -- AnchorPoint (0.5, 0.5) olduğu için hesaplama biraz farklıdır
+                -- Bu yüzden burada UDim2.fromOffset kullanarak kesin pozisyon veririz:
+                MainFrame.Position = UDim2.fromOffset(startPosition.X.Offset + delta.X, startPosition.Y.Offset + delta.Y)
             end
         end
     end)
