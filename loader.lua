@@ -1,31 +1,27 @@
--- Emochi UI Loader
-if shared.Emochi_UI then return shared.Emochi_UI end
+-- Emochi UI - Loader (final)
+-- Tüm modülleri buradan yönetiyoruz
 
--- Ana Emochi tablosunu ve temel bilgileri shared'da oluşturalım.
--- Böylece alt modüller (window.lua gibi) bu tabloya erişebilir.
-shared.Emochi_UI = {
-    Version = "2.0.0",
-    Author = "emirontop1 & Gemini",
-    ActiveWindows = {} -- Tüm pencereleri global olarak takip etmek için
-}
+local BASE_URL = "https://raw.githubusercontent.com/emirontop1/Emochi/main/"
+local Emochi = {}
 
-local Emochi = shared.Emochi_UI
-
--- Yüklenecek elementlerin listesi
-local components = {"window"} -- Gelecekte buraya "button", "slider" gibi elemanlar ekleyebilirsiniz.
-
-for _, name in ipairs(components) do
-    local url = "https://raw.githubusercontent.com/emirontop1/Emochi/main/elements/" .. name .. ".lua"
-    local success, module = pcall(function()
-        return loadstring(game:HttpGet(url))()
+-- Güvenli yükleme fonksiyonu
+local function safeLoad(path)
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(BASE_URL .. path))()
     end)
-    if success and module then
-        Emochi[name] = module
-    else
-        warn("Emochi UI: " .. name .. " yüklenemedi! URL: " .. url)
+    if not success then
+        warn("[Emochi Loader] Modül yüklenemedi: " .. path .. " | Hata: " .. tostring(result))
+        return nil
     end
+    return result
 end
 
-return Emochi
+-- Window elementini yükle
+Emochi.window = safeLoad("elements/window.lua")
 
---[[:<]]
+-- Buraya gelecekte başka elementleri de ekleyebilirsin
+-- Emochi.button = safeLoad("elements/button.lua")
+-- Emochi.slider = safeLoad("elements/slider.lua")
+
+-- Son olarak tablomuzu döndürelim
+return Emochi
