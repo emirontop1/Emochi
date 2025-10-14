@@ -172,7 +172,7 @@ function WindowModule:Create(options)
 
     -- Header'ın Alt Köşeleri (Ana pencere köşe radyanıyla uyumlu, üstte tam köşe)
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = header })
-    CreateInstance("UIConstraint", { Parent = header }) -- Header'ın alt tarafını düz tutmak için farklı bir yapı kullanabiliriz, ancak bu bir başlangıç.
+   -- CreateInstance("UIConstraint", { Parent = header }) -- Header'ın alt tarafını düz tutmak için farklı bir yapı kullanabiliriz, ancak bu bir başlangıç.
 
     local titleLabel = CreateInstance("TextLabel", { Name = "Title", Parent = header, Size = UDim2.new(0.8, 0, 1, 0), Position = UDim2.new(0.03, 0, 0, -5), Text = "<b>" .. config.Title .. "</b>",
         RichText = true, Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = colors.Text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1 })
