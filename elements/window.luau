@@ -3,35 +3,63 @@
 local Window = {}
 Window.__index = Window
 
--- Window Modülünün Constructor'ı
+local AddTabFunction = nil
+
+-- Enum'ları (sabit değerleri) simüle edelim
+local EasingStyle = { Quad = "Quad", Cubic = "Cubic", Sine = "Sine" }
+local Direction = { In = "In", Out = "Out", InOut = "InOut" }
+
+function Window.Inject(functions)
+    AddTabFunction = functions.AddTab 
+    print("[Window Module] Bağımlılıklar başarıyla enjekte edildi.")
+end
+
 function Window.new(options)
     local self = setmetatable({}, Window)
     
-    self.Title = options.Title or "Default Emochi Window"
-    self.Elements = {}
+    -- *** GÜZEL GUI ÖZELLİKLERİ VE PARAMETRELERİ ***
+    self.Title = options.Title or "Emochi Fluent UI"
+    self.SubTitle = options.SubTitle or "" 
+    self.Icon = options.Icon or "settings-2" -- Lucide Icons (örnek olarak bir isim)
     
-    print(string.format("[Window Module] Yeni Pencere Yaratıldı: %s", self.Title))
+    -- STİL VE GÖRÜNÜM PARAMETRELERİ
+    self.Size = options.Size or UDim2.fromOffset(750, 500)
+    self.ThemeColor = options.ThemeColor or Color3.fromRGB(80, 100, 255) -- Ana Renk
+    self.Acrylic = options.Acrylic or false -- Akrilik (Blur) efekt aktif mi?
+    self.MinimizeKey = options.MinimizeKey or "RightControl" -- Kısayol Tuşu
+    
+    -- ANİMASYON PARAMETRELERİ
+    self.AnimationTime = options.AnimationTime or 0.3 -- Animasyon süresi (saniye)
+    self.EasingStyle = EasingStyle[options.EasingStyle] or EasingStyle.Quad
+    self.EasingDirection = Direction[options.EasingDirection] or Direction.Out
+    
+    self.IsMinimized = false
+    self.Tabs = {}
 
+    print(string.format("[Window Module] '%s' Başlatıldı. Stil: Tema Rengi(%s), Easing(%s)", 
+        self.Title, self.ThemeColor, self.EasingStyle))
+    
+    -- Gerçek kodda, bu noktada pencere UI'ı yukarıdaki parametrelerle oluşturulur.
+    
     return self
 end
 
--- Örnek Sekme Ekleme Fonksiyonu
-function Window:AddTab(options)
-    print(string.format("[Window] Sekme Ekleme Çağrıldı: %s", options.Title or "Yeni Sekme"))
+-- Animasyonlu Minimize İşlevi
+function Window:Minimize()
+    self.IsMinimized = not self.IsMinimized 
+    local targetPosition = self.IsMinimized and UDim2.fromScale(1.5, 0) or UDim2.fromScale(0.5, 0.5) -- Örnek pozisyonlar
     
-    local Tab = {
-        Title = options.Title,
-        AddButton = function(btnOptions)
-            print(string.format("  -> Buton Eklendi: %s. Geri arama çalışıyor!", btnOptions.Title))
-            if btnOptions.Callback then
-                btnOptions.Callback()
-            end
-        end
-    }
-    table.insert(self.Elements, Tab)
+    print(string.format("[Window] Minimization animasyonu başlatıldı. Süre: %.1fs, Stil: %s", 
+        self.AnimationTime, self.EasingStyle))
     
-    return Tab
+    -- Gerçek kodda: game:GetService("TweenService"):Create(self.Frame, TweenInfo.new(self.AnimationTime, self.EasingStyle), {Position = targetPosition}):Play()
 end
 
--- Geriye Modülün Kendisini Döndür
+function Window:AddTab(options)
+    if not AddTabFunction then error("AddTab fonksiyonu enjekte edilmedi.") end
+    local newTab = AddTabFunction(self, options) 
+    table.insert(self.Tabs, newTab)
+    return newTab
+end
+
 return Window
