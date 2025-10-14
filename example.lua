@@ -3,12 +3,14 @@ local LOADER_URL = "https://raw.githubusercontent.com/emirontop1/Ligma/main/load
 local Emochi = loadstring(game:HttpGet(LOADER_URL))()
 
 local myWindow = Emochi.window:Create({
-    Title = "Geliştirici Paneli",
-    Size = UDim2.fromOffset(650, 500)
+    Title = "Yeni Menü",
+    Theme = "Dracula",
+    Size = UDim2.fromOffset(700, 500),
+    MinimizeMobileButton = true, -- Uzaktan küçültme butonu eklendi
+    CornerRadius = UDim.new(0, 15) -- Daha da smooth köşeler
 })
 
--- Örnek: Buton eklemek
--- local myButton = Instance.new("TextButton")
--- myButton.Text = "Hile Aktif Et"
--- myButton.Size = UDim2.fromOffset(200, 50)
--- myButton.Parent = myWindow.Container
+-- Kontrolleri eskisi gibi myWindow.Container içine eklemeye devam edebilirsiniz
+-- Örneğin:
+-- local button = Instance.new("TextButton")
+-- button.Parent = myWindow.Container
