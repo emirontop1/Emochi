@@ -1,5 +1,5 @@
 --[[
-    Emochi UI - Window Modülü (Minimize Butonu Eklendi, Sürükleme Hatası Giderildi)
+    Emochi UI - Window Modülü (Sürükleme Hatası Giderildi ve Fluent Tarzı Minimize Tamamlandı)
 ]]
 
 -- Roblox Servisleri
@@ -7,13 +7,9 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
--- Loader'da oluşturulan ana Emochi tablosuna 'shared' üzerinden erişim
 local Emochi = shared.Emochi_UI
 
--- Pencere modülünün kendisi
-local WindowModule = {}
-
--- Temalar
+-- Temalar (Aynı Kaldı)
 local ThemeColors = {
     Dark = {
         Background = Color3.fromRGB(20, 20, 25), 
@@ -57,45 +53,47 @@ end
 local WindowProto = {}
 WindowProto.__index = WindowProto
 
-function WindowProto:SetVisible(visible)
-    self.Visible = visible
-    local goalPosition = self.InitialPosition
-    
-    if not visible then
-        -- Minimize/Gizleme animasyonu: Aşağı kaydır ve küçült (Fluent tarzı)
-        goalPosition = self.InitialPosition + UDim2.fromOffset(0, 30)
-        Animate(self.Instance, {Position = goalPosition, BackgroundTransparency = 1}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        -- İçeriği anında gizle (Animasyonun bitmesini beklemeye gerek yok)
-        for _, child in ipairs(self.Instance:GetDescendants()) do
-             if child:IsA("GuiObject") and child.Name ~= "Shadow" and child.Name ~= "MinimizeButton" then
-                 child.Visible = false
-             end
-        end
-        if self.MinimizeButton then self.MinimizeButton.ImageTransparency = 0 end
+-- Minimize/Restore Mantığı
+function WindowProto:Toggle()
+    local isMinimized = self.Instance.Size.Y.Offset == self.Config.HeaderHeight
+    local targetSize, targetCornerRadius
+
+    if isMinimized then
+        -- PENCEREYİ BÜYÜT (RESTORE)
+        targetSize = self.InitialSize
+        targetCornerRadius = self.Config.CornerRadius
+        
+        -- İçeriği animasyondan hemen önce göster
+        self.TabContainerWrapper.Visible = true
+        self.ContentContainerWrapper.Visible = true
+        
+        Animate(self.Instance, { Size = targetSize }, 0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     else
-        -- Gösterme animasyonu
-        self.Instance.BackgroundTransparency = 0 -- Arka planı anında göster
+        -- PENCEREYİ KÜÇÜLT (MINIMIZE)
+        targetSize = UDim2.fromOffset(self.InitialSize.X.Offset, self.Config.HeaderHeight)
+        targetCornerRadius = UDim.new(0, 6) -- Sadece başlık çubuğu kalınca daha keskin köşe
         
-        -- İçeriği anında göster
-        for _, child in ipairs(self.Instance:GetDescendants()) do
-             if child:IsA("GuiObject") and child.Name ~= "Shadow" and child.Name ~= "MinimizeButton" then
-                 child.Visible = true
-             end
-        end
+        Animate(self.Instance, { Size = targetSize }, 0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         
-        Animate(self.Instance, {Position = goalPosition}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-        if self.MinimizeButton then self.MinimizeButton.ImageTransparency = 1 end
+        -- İçeriği animasyondan sonra gizle
+        task.wait(0.2)
+        self.TabContainerWrapper.Visible = false
+        self.ContentContainerWrapper.Visible = false
     end
     
-    -- Minimize butonu ikonunu güncelle
+    -- Köşe yarıçapı animasyonu
+    Animate(self.Instance:FindFirstChildOfClass("UICorner"), { CornerRadius = targetCornerRadius }, 0.3)
+    
+    -- Remote minimize butonunu da gizle/göster
+    if self.MinimizeButton then
+         self.MinimizeButton.ImageTransparency = isMinimized and 1 or 0
+    end
+    
+    -- Minimize butonu üzerindeki ikonu değiştir
     local minButton = self.Instance:FindFirstChild("Header"):FindFirstChild("MinimizeWindowButton")
     if minButton then
-        minButton.Text = visible and "_" or "^" -- Örnek ikon değiştirme
+        minButton.Text = isMinimized and "_" or "^"
     end
-end
-
-function WindowProto:Toggle()
-    self:SetVisible(not self.Visible)
 end
 
 function WindowProto:Destroy()
@@ -139,7 +137,8 @@ function WindowModule:Create(options)
     }
 
     local colors = ThemeColors[config.Theme] or ThemeColors.Dark
-
+    newWindow.Config = config
+    
     local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
     local screenGui = playerGui:FindFirstChild("EmochiScreenGui")
     if not screenGui then
@@ -155,6 +154,7 @@ function WindowModule:Create(options)
     
     newWindow.Instance = windowFrame
     newWindow.InitialPosition = windowFrame.Position
+    newWindow.InitialSize = config.Size
     newWindow.Visible = true
 
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = windowFrame })
@@ -169,23 +169,26 @@ function WindowModule:Create(options)
         CreateInstance("UIBlur", { Name = "BackgroundBlur", Parent = windowFrame, Size = config.BlurIntensity * 24 })
     end
     
-    -- #region SOL TAB ALANI
+    -- #region SOL TAB ALANI (WRAPPER KULLANILDI)
 
-    local tabContainer = CreateInstance("Frame", { 
-        Name = "TabContainer", Parent = windowFrame, 
+    local tabContainerWrapper = CreateInstance("Frame", {
+        Name = "TabContainerWrapper", Parent = windowFrame,
         Size = UDim2.new(0, config.TabAreaWidth, 1, -config.HeaderHeight), 
         Position = UDim2.new(0, 0, 0, config.HeaderHeight), 
-        BackgroundColor3 = colors.Secondary, BorderSizePixel = 0, ZIndex = 2,
-        ClipsDescendants = true
+        BackgroundColor3 = colors.Secondary, BorderSizePixel = 0, 
+        ClipsDescendants = true,
+        ZIndex = 2 -- Başlık çubuğunun altında, içerik üzerinde
     })
+    
+    newWindow.TabContainerWrapper = tabContainerWrapper -- Kayıt
 
     CreateInstance("UICorner", { 
         CornerRadius = config.CornerRadius, 
-        Parent = tabContainer,
+        Parent = tabContainerWrapper,
     }) 
     
     local tabButtonHolder = CreateInstance("ScrollingFrame", {
-        Name = "TabButtonHolder", Parent = tabContainer,
+        Name = "TabButtonHolder", Parent = tabContainerWrapper,
         Size = UDim2.new(1, -20, 1, -10),
         Position = UDim2.fromOffset(10, 5),
         BackgroundTransparency = 1, BorderSizePixel = 0,
@@ -210,8 +213,8 @@ function WindowModule:Create(options)
         Name = "Header", Parent = windowFrame, 
         Size = UDim2.new(1, 0, 0, config.HeaderHeight), 
         BackgroundColor3 = colors.Primary, BorderSizePixel = 0,
-        ClipsDescendants = false, -- ÖĞE KAYBOLMASI DÜZELTMESİ: Header'da ClipDescendants'ı kapattık
-        ZIndex = 3
+        ClipsDescendants = false, 
+        ZIndex = 3 -- En üstte olmalı
     })
     
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = header })
@@ -246,7 +249,7 @@ function WindowModule:Create(options)
         closeButton.MouseEnter:Connect(function() Animate(closeButton, {BackgroundColor3 = Color3.fromRGB(255, 80, 80)}, 0.2) end)
         closeButton.MouseLeave:Connect(function() Animate(closeButton, {BackgroundColor3 = colors.Primary}, 0.2) end)
         closeButton.MouseButton1Click:Connect(function() newWindow:Destroy() end)
-        buttonXOffset = buttonXOffset + config.HeaderHeight -- Sonraki butonun konumunu ayarla
+        buttonXOffset = buttonXOffset + config.HeaderHeight
     end
     
     -- Minimize Butonu
@@ -261,25 +264,30 @@ function WindowModule:Create(options)
     minimizeButton.MouseLeave:Connect(function() Animate(minimizeButton, {BackgroundColor3 = colors.Primary}, 0.2) end)
     minimizeButton.MouseButton1Click:Connect(function() newWindow:Toggle() end)
     
-    -- Sürükleme Mantığı (Hata çözülmüş hali)
+    -- Sürükleme Mantığı (Hata Giderildi)
     if config.Draggable then
         local dragging, dragStart, startPos
         header.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging, dragStart, startPos = true, input.Position, windowFrame.Position
                 windowFrame.ZIndex = 10 -- Sürüklerken üste taşı
+                
+                -- Sürükleme Hatası Kesin Çözüm 3: Öğelerin kaybolmasını önlemek için ZIndex'i sürükleme süresince yüksek tut
+                tabContainerWrapper.ZIndex = 9
+                newWindow.ContentContainerWrapper.ZIndex = 9
+
                 local conn; conn = input.Changed:Connect(function() 
                     if input.UserInputState == Enum.UserInputState.End then 
                         dragging = false; 
-                        windowFrame.ZIndex = 1; 
+                        windowFrame.ZIndex = 1;
+                        tabContainerWrapper.ZIndex = 2
+                        newWindow.ContentContainerWrapper.ZIndex = 1
                         conn:Disconnect() 
                     end 
                 end)
             end
         end)
         UserInputService.InputChanged:Connect(function(input)
-            -- Sürükleme sırasında öğelerin kaybolmasını engelleyen şey:
-            -- Transparanlık animasyonu yapmamak ve ZIndex'i kontrol etmek.
             if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStart
                 windowFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -289,15 +297,23 @@ function WindowModule:Create(options)
     
     -- #endregion
 
-    -- #region ANA İÇERİK KONTEYNERİ (SAĞ TARAF)
+    -- #region ANA İÇERİK KONTEYNERİ (SAĞ TARAF - WRAPPER KULLANILDI)
 
     local padding = 10
-    local contentContainer = CreateInstance("Frame", { 
-        Name = "ContentContainer", Parent = windowFrame, 
+    local contentContainerWrapper = CreateInstance("Frame", { 
+        Name = "ContentContainerWrapper", Parent = windowFrame, 
         Size = UDim2.new(1, -config.TabAreaWidth - (2 * padding), 1, -config.HeaderHeight - (2 * padding)),
         Position = UDim2.new(0, config.TabAreaWidth + padding, 0, config.HeaderHeight + padding), 
         BackgroundTransparency = 1,
-        ZIndex = 1
+        ZIndex = 1 -- TabContainer'dan daha düşük ZIndex
+    })
+    
+    newWindow.ContentContainerWrapper = contentContainerWrapper -- Kayıt
+
+    local contentContainer = CreateInstance("Frame", {
+        Name = "ContentContainer", Parent = contentContainerWrapper,
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
     })
     
     newWindow.Container = contentContainer 
@@ -309,7 +325,7 @@ function WindowModule:Create(options)
     -- Klavye kısayolu ile Toggle
     newWindow.InputConnection = UserInputService.InputBegan:Connect(function(input, gp) if not gp and input.KeyCode == config.MinimizeKey then newWindow:Toggle() end end)
 
-    -- Remote Minimize Butonu Ekleme
+    -- Remote Minimize Butonu Ekleme (Aynı Kaldı)
     if config.MinimizeMobileButton then
         local minimizeRemoteButton = CreateInstance("ImageButton", {
             Name = "MinimizeMobileButton", Parent = screenGui, 
