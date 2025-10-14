@@ -16,8 +16,7 @@ local Emochi = shared.Emochi_UI
 -- Pencere modülünün kendisi (loader'a bu tablo return edilecek)
 local WindowModule = {}
 
--- Kütüphane içinde kullanılacak temalar (artık ana tabloda değil, burada daha mantıklı olabilir)
--- Eğer temaları global yapmak isterseniz bunu loader'daki Emochi tablosuna taşıyabilirsiniz.
+-- Kütüphane içinde kullanılacak temalar
 local ThemeColors = {
     Dark = {
         Background = Color3.fromRGB(35, 35, 45), Primary = Color3.fromRGB(45, 45, 55),
@@ -84,6 +83,11 @@ function WindowProto:SetVisible(visible)
         end
     end
     Animate(self.Instance, {BackgroundTransparency = goalTransparency}, 0.3)
+    
+    -- Remote Minimize Butonu animasyonu
+    if self.MinimizeButton then
+        Animate(self.MinimizeButton, {ImageTransparency = goalTransparency}, 0.3)
+    end
 end
 
 function WindowProto:Toggle()
@@ -94,6 +98,10 @@ function WindowProto:Destroy()
     if self.InputConnection then
         self.InputConnection:Disconnect()
         self.InputConnection = nil
+    end
+
+    if self.MinimizeButton then
+        self.MinimizeButton:Destroy()
     end
 
     local size = self.Instance.AbsoluteSize
@@ -120,8 +128,12 @@ function WindowModule:Create(options)
         InitialPosition = options.InitialPosition,
         ShadowEnabled = options.ShadowEnabled ~= nil and options.ShadowEnabled or true,
         BlurIntensity = options.BlurIntensity or 0,
-        CornerRadius = options.CornerRadius or UDim.new(0, 8),
-        HeaderHeight = options.HeaderHeight or 40
+        -- Köşe radyanı biraz artırıldı
+        CornerRadius = options.CornerRadius or UDim.new(0, 10), 
+        HeaderHeight = options.HeaderHeight or 40,
+        -- Yeni opsiyon: Uzaktan küçültme butonu
+        MinimizeMobileButton = options.MinimizeMobileButton ~= nil and options.MinimizeMobileButton or false, 
+        TabAreaHeight = options.TabAreaHeight or 40 -- Yeni opsiyon: Sekme alanı yüksekliği
     }
 
     local colors = ThemeColors[config.Theme] or ThemeColors.Dark
@@ -142,6 +154,7 @@ function WindowModule:Create(options)
     newWindow.InitialPosition = windowFrame.Position
     newWindow.Visible = true
 
+    -- Ana pencere için köşeler
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = windowFrame })
 
     if config.ShadowEnabled then
@@ -154,7 +167,12 @@ function WindowModule:Create(options)
         CreateInstance("UIBlur", { Name = "BackgroundBlur", Parent = windowFrame, Size = config.BlurIntensity * 24 })
     end
 
+    -- Header (Başlık Çubuğu)
     local header = CreateInstance("Frame", { Name = "Header", Parent = windowFrame, Size = UDim2.new(1, 0, 0, config.HeaderHeight), BackgroundColor3 = colors.Primary, BorderSizePixel = 0 })
+
+    -- Header'ın Alt Köşeleri (Ana pencere köşe radyanıyla uyumlu, üstte tam köşe)
+    CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = header })
+    CreateInstance("UIConstraint", { Parent = header }) -- Header'ın alt tarafını düz tutmak için farklı bir yapı kullanabiliriz, ancak bu bir başlangıç.
 
     local titleLabel = CreateInstance("TextLabel", { Name = "Title", Parent = header, Size = UDim2.new(0.8, 0, 1, 0), Position = UDim2.new(0.03, 0, 0, -5), Text = "<b>" .. config.Title .. "</b>",
         RichText = true, Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = colors.Text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1 })
@@ -175,6 +193,9 @@ function WindowModule:Create(options)
         header.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging, dragStart, startPos = true, input.Position, windowFrame.Position
+                -- Pencereyi diğerlerinin üzerine taşı
+                windowFrame:GetParent():ClearAllChildren() -- ZIndex ayarları için
+                windowFrame.Parent = screenGui -- Tekrar en üste ekle
                 local conn; conn = input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false; conn:Disconnect() end end)
             end
         end)
@@ -186,14 +207,41 @@ function WindowModule:Create(options)
         end)
     end
     
-    local contentContainer = CreateInstance("Frame", { Name = "ContentContainer", Parent = windowFrame, Size = UDim2.new(1, -20, 1, -config.HeaderHeight - 10),
-        Position = UDim2.new(0, 10, 0, config.HeaderHeight + 5), BackgroundTransparency = 1 })
+    -- Sekme Alanı Konteyneri (Tab Container)
+    local tabContainer = CreateInstance("Frame", { Name = "TabContainer", Parent = windowFrame, Size = UDim2.new(1, 0, 0, config.TabAreaHeight),
+        Position = UDim2.new(0, 0, 0, config.HeaderHeight), BackgroundColor3 = colors.Secondary, BorderSizePixel = 0, ZIndex = 2 })
+
+    -- Sekme Konteynerinin Alt Kısmı için Köşe (Opsiyonel olarak)
+    -- CreateInstance("UICorner", { CornerRadius = UDim.new(0, 5), Parent = tabContainer })
+
+    -- Ana İçerik Konteyneri (Tablar ve Kontroller buraya gelecek)
+    local contentContainer = CreateInstance("Frame", { Name = "ContentContainer", Parent = windowFrame, 
+        Size = UDim2.new(1, -20, 1, -config.HeaderHeight - config.TabAreaHeight - 10),
+        Position = UDim2.new(0, 10, 0, config.HeaderHeight + config.TabAreaHeight + 5), 
+        BackgroundTransparency = 1, ZIndex = 1 })
     
-    newWindow.Container = contentContainer
-    
+    newWindow.Container = contentContainer -- Kontrollerin ekleneceği kısım
+
     CreateInstance("UIListLayout", { Parent = contentContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) })
     
+    -- Klavye kısayolu ile Toggle
     newWindow.InputConnection = UserInputService.InputBegan:Connect(function(input, gp) if not gp and input.KeyCode == config.MinimizeKey then newWindow:Toggle() end end)
+
+    -- Remote Minimize Butonu Ekleme
+    if config.MinimizeMobileButton then
+        local minimizeButton = CreateInstance("ImageButton", {
+            Name = "MinimizeMobileButton", Parent = screenGui, 
+            Size = UDim2.fromOffset(40, 40), Position = UDim2.fromScale(1, 0.05) - UDim2.fromOffset(50, 0),
+            BackgroundTransparency = 1, Image = "rbxassetid://2526742566", -- Örnek bir ikon (Dişli, Ayar vs.)
+            ImageColor3 = colors.Accent, ZIndex = 10 
+        })
+        
+        minimizeButton.MouseButton1Click:Connect(function()
+            newWindow:Toggle()
+        end)
+        
+        newWindow.MinimizeButton = minimizeButton
+    end
 
     local initialSize = config.Size
     windowFrame.Size = UDim2.fromOffset(0, 0)
