@@ -1,7 +1,5 @@
 --[[
-    Emochi UI - Window Modülü (Modern Fluent Tasarıma Güncellenmiş Versiyon)
-    Amaç: İlk koddaki basit yapıyı koruyarak, Fluent UI'dan ilham alan modern bir
-    görünüm (sol tab bar, smooth köşeler) kazandırmak.
+    Emochi UI - Window Modülü (Modern Fluent Tasarıma Güncellenmiş ve Hataları Giderilmiş Versiyon)
 ]]
 
 -- Roblox Servisleri
@@ -18,16 +16,13 @@ local WindowModule = {}
 -- Temalar
 local ThemeColors = {
     Dark = {
-        -- Daha koyu, modern arka plan ve yumuşak Primary (Başlık Çubuğu)
         Background = Color3.fromRGB(20, 20, 25), 
         Primary = Color3.fromRGB(30, 30, 38), 
-        -- Sekme Alanı/Sol bar için farklı bir ton (Fluent tarzı)
         Secondary = Color3.fromRGB(30, 30, 38), 
-        Accent = Color3.fromRGB(0, 120, 212), -- Modern Mavi
+        Accent = Color3.fromRGB(0, 120, 212),
         Text = Color3.fromRGB(240, 240, 240), SubText = Color3.fromRGB(180, 180, 180),
         Border = Color3.fromRGB(15, 15, 20), Shadow = Color3.fromRGB(0, 0, 0)
     },
-    -- Diğer temalar aynı kalır
     Light = {
         Background = Color3.fromRGB(245, 245, 245), Primary = Color3.fromRGB(255, 255, 255),
         Secondary = Color3.fromRGB(230, 230, 230), Accent = Color3.fromRGB(0, 122, 255),
@@ -71,17 +66,19 @@ function WindowProto:SetVisible(visible)
         goalPosition = self.InitialPosition + UDim2.fromOffset(0, 30)
     end
     
+    -- Pencere Ana Çerçeve Animasyonu
     Animate(self.Instance, {Position = goalPosition}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     
+    -- İçerik Şeffaflık Animasyonu (Sadece görünmez yaparken tetiklenmeli)
     for _, child in ipairs(self.Instance:GetDescendants()) do
-        if child:IsA("GuiObject") then
-            local isShadow = (child.Name == "Shadow")
+        if child:IsA("GuiObject") and child.Name ~= "Shadow" then
+            -- GuiObject'leri sadece BackgroundTransparency/ImageTransparency için animasyonla
             if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
                 Animate(child, {TextTransparency = goalTransparency}, 0.3)
-                if not isShadow then Animate(child, {BackgroundTransparency = goalTransparency}, 0.3) end
-            elseif child:IsA("ImageLabel") and not isShadow then
+                Animate(child, {BackgroundTransparency = goalTransparency}, 0.3)
+            elseif child:IsA("ImageLabel") then
                 Animate(child, {ImageTransparency = goalTransparency}, 0.3)
-            elseif not (child:IsA("UIComponent") or isShadow) then
+            elseif not child:IsA("UIComponent") then
                  Animate(child, {BackgroundTransparency = goalTransparency}, 0.3)
             end
         end
@@ -124,7 +121,7 @@ function WindowModule:Create(options)
     local config = {
         Title = options.Title or "Emochi UI",
         SubTitle = options.SubTitle or "Version " .. Emochi.Version,
-        Size = options.Size or UDim2.fromOffset(650, 450), -- Biraz büyüdü
+        Size = options.Size or UDim2.fromOffset(650, 450), 
         Theme = options.Theme or "Dark",
         Draggable = options.Draggable ~= nil and options.Draggable or true,
         Closable = options.Closable ~= nil and options.Closable or true,
@@ -132,10 +129,10 @@ function WindowModule:Create(options)
         InitialPosition = options.InitialPosition,
         ShadowEnabled = options.ShadowEnabled ~= nil and options.ShadowEnabled or true,
         BlurIntensity = options.BlurIntensity or 0,
-        CornerRadius = options.CornerRadius or UDim.new(0, 12), -- Daha belirgin smooth köşe
-        HeaderHeight = options.HeaderHeight or 36, -- Daha ince başlık çubuğu
+        CornerRadius = options.CornerRadius or UDim.new(0, 12),
+        HeaderHeight = options.HeaderHeight or 36,
         MinimizeMobileButton = options.MinimizeMobileButton ~= nil and options.MinimizeMobileButton or false, 
-        TabAreaWidth = options.TabAreaWidth or 160 -- Sekme alanı dikey olduğu için genişlik
+        TabAreaWidth = options.TabAreaWidth or 160 
     }
 
     local colors = ThemeColors[config.Theme] or ThemeColors.Dark
@@ -149,7 +146,8 @@ function WindowModule:Create(options)
     local windowFrame = CreateInstance("Frame", {
         Name = "WindowFrame", Parent = screenGui, Size = config.Size,
         Position = config.InitialPosition or UDim2.fromScale(0.5, 0.5) - UDim2.fromOffset(config.Size.X.Offset / 2, config.Size.Y.Offset / 2),
-        BackgroundColor3 = colors.Background, BorderSizePixel = 0, ClipsDescendants = true
+        BackgroundColor3 = colors.Background, BorderSizePixel = 0, ClipsDescendants = true,
+        ZIndex = 1 -- Varsayılan ZIndex
     })
     
     newWindow.Instance = windowFrame
@@ -173,17 +171,21 @@ function WindowModule:Create(options)
 
     local tabContainer = CreateInstance("Frame", { 
         Name = "TabContainer", Parent = windowFrame, 
-        Size = UDim2.new(0, config.TabAreaWidth, 1, -config.HeaderHeight), -- Başlık çubuğu yüksekliği düşüldü
+        -- Yükseklik: Toplam yükseklik - Header yüksekliği
+        Size = UDim2.new(0, config.TabAreaWidth, 1, -config.HeaderHeight), 
+        -- Konum: Başlık Çubuğunun hemen altından başla
         Position = UDim2.new(0, 0, 0, config.HeaderHeight), 
         BackgroundColor3 = colors.Secondary, BorderSizePixel = 0, ZIndex = 2,
         ClipsDescendants = true
     })
 
-    -- Sol Tab Alanı İçin Köşeler (Alt-Sol Köşe: Smooth)
-    -- Üst sol köşe Başlık Çubuğu tarafından kontrol edilir.
-    CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = tabContainer })
+    -- Sol Tab Alanı Köşesi (Alt-Sol Köşe)
+    -- Üst sol köşe Başlık Çubuğu tarafından kontrol edildiği için sadece alt-sol yuvarlatılır
+    CreateInstance("UICorner", { 
+        CornerRadius = config.CornerRadius, 
+        Parent = tabContainer,
+    }) 
     
-    -- Tab Düğmelerinin Yerleşimi (İleride buraya eklenecek)
     local tabButtonHolder = CreateInstance("ScrollingFrame", {
         Name = "TabButtonHolder", Parent = tabContainer,
         Size = UDim2.new(1, -20, 1, -10),
@@ -200,7 +202,7 @@ function WindowModule:Create(options)
         Padding = UDim.new(0, 6) 
     })
 
-    newWindow.TabContainer = tabButtonHolder -- Tab butonları buraya eklenecek
+    newWindow.TabContainer = tabButtonHolder
 
     -- #endregion
 
@@ -209,7 +211,8 @@ function WindowModule:Create(options)
     local header = CreateInstance("Frame", { 
         Name = "Header", Parent = windowFrame, 
         Size = UDim2.new(1, 0, 0, config.HeaderHeight), 
-        BackgroundColor3 = colors.Primary, BorderSizePixel = 0 
+        BackgroundColor3 = colors.Primary, BorderSizePixel = 0,
+        ZIndex = 3 -- Header her zaman üstte olmalı
     })
     
     -- Başlık Çubuğu Köşeleri (Üst-Sol ve Üst-Sağ)
@@ -217,7 +220,9 @@ function WindowModule:Create(options)
 
     local titleLabel = CreateInstance("TextLabel", { 
         Name = "Title", Parent = header, 
-        Size = UDim2.new(1, -config.TabAreaWidth, 1, 0), -- Sağ içeriğin genişliği
+        -- Genişlik: Toplam - Tab Genişliği - Boşluk
+        Size = UDim2.new(1, -config.TabAreaWidth - 60, 1, 0), 
+        -- Konum: Tab Genişliği + Sağ boşluktan başla
         Position = UDim2.new(0, config.TabAreaWidth + 10, 0, 0), 
         Text = "<b>" .. config.Title .. "</b>",
         RichText = true, Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = colors.Text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1 
@@ -234,7 +239,8 @@ function WindowModule:Create(options)
             Name = "CloseButton", Parent = header, 
             Size = UDim2.fromOffset(config.HeaderHeight, config.HeaderHeight),
             Position = UDim2.new(1, -config.HeaderHeight, 0, 0), 
-            BackgroundColor3 = colors.Primary, Text = "X", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = colors.Text 
+            BackgroundColor3 = colors.Primary, Text = "X", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = colors.Text,
+            ZIndex = 4
         })
         closeButton.MouseEnter:Connect(function() Animate(closeButton, {BackgroundColor3 = Color3.fromRGB(255, 80, 80)}, 0.2) end)
         closeButton.MouseLeave:Connect(function() Animate(closeButton, {BackgroundColor3 = colors.Primary}, 0.2) end)
@@ -253,8 +259,7 @@ function WindowModule:Create(options)
         UserInputService.InputChanged:Connect(function(input)
             if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStart
-                -- Hızlı sürükleme için Instant/Spring yerine doğrudan atama yapılıyor,
-                -- ancak bu kod yapısında 'Instant' motora gerek kalmaz, direkt atama yaparız
+                -- Sürükleme sırasında ekranın dönmesini engelleyen şey budur: Mutlak offset kullanmak.
                 windowFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
         end)
@@ -264,16 +269,21 @@ function WindowModule:Create(options)
 
     -- #region ANA İÇERİK KONTEYNERİ (SAĞ TARAF)
 
+    -- Sağdaki içerik için ayrılan alanda padding bırakıyoruz (örneğin 10 birim)
+    local padding = 10
     local contentContainer = CreateInstance("Frame", { 
         Name = "ContentContainer", Parent = windowFrame, 
-        Size = UDim2.new(1, -config.TabAreaWidth - 20, 1, -config.HeaderHeight - 20), -- Genişlik ve Yükseklik hesaplandı
-        Position = UDim2.new(0, config.TabAreaWidth + 10, 0, config.HeaderHeight + 10), -- Konum Sol bar ve Başlık altı
-        BackgroundTransparency = 1 
+        -- Genişlik: Pencere Genişliği - Tab Genişliği - (2 * Padding)
+        Size = UDim2.new(1, -config.TabAreaWidth - (2 * padding), 1, -config.HeaderHeight - (2 * padding)),
+        -- Konum: Tab Genişliği + Padding, Header Yüksekliği + Padding
+        Position = UDim2.new(0, config.TabAreaWidth + padding, 0, config.HeaderHeight + padding), 
+        BackgroundTransparency = 1,
+        ZIndex = 1
     })
     
-    newWindow.Container = contentContainer -- Kontrollerin ekleneceği kısım
+    newWindow.Container = contentContainer 
 
-    CreateInstance("UIListLayout", { Parent = contentContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) }) -- Daha geniş padding
+    CreateInstance("UIListLayout", { Parent = contentContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) })
     
     -- #endregion
     
@@ -285,8 +295,8 @@ function WindowModule:Create(options)
         local minimizeButton = CreateInstance("ImageButton", {
             Name = "MinimizeMobileButton", Parent = screenGui, 
             Size = UDim2.fromOffset(40, 40), Position = UDim2.fromScale(1, 0.05) - UDim2.fromOffset(50, 0),
-            BackgroundTransparency = 1, Image = "rbxassetid://2526742566", -- Örnek ikon (Dişli)
-            ImageColor3 = colors.Accent, ZIndex = 10, ImageTransparency = 1 -- Başlangıçta gizli
+            BackgroundTransparency = 1, Image = "rbxassetid://2526742566",
+            ImageColor3 = colors.Accent, ZIndex = 10, ImageTransparency = 1 
         })
         
         minimizeButton.MouseButton1Click:Connect(function()
