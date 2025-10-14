@@ -1,7 +1,7 @@
 -- Emochi UI - Loader (final)
 -- Tüm modülleri buradan yönetiyoruz
 
-local BASE_URL = "https://raw.githubusercontent.com/emirontop1/Emochi/main/"
+local BASE_URL = "https://raw.githubusercontent.com/emirontop1/Emochi/refs/heads/main/"
 local Emochi = {}
 
 -- Güvenli yükleme fonksiyonu
