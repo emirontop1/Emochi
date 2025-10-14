@@ -1,5 +1,5 @@
 --[[
-    Emochi UI - Window Modülü (Modern Fluent Tasarıma Güncellenmiş ve Hataları Giderilmiş Versiyon)
+    Emochi UI - Window Modülü (Minimize Butonu Eklendi, Sürükleme Hatası Giderildi)
 ]]
 
 -- Roblox Servisleri
@@ -60,34 +60,37 @@ WindowProto.__index = WindowProto
 function WindowProto:SetVisible(visible)
     self.Visible = visible
     local goalPosition = self.InitialPosition
-    local goalTransparency = visible and 0 or 1
-
+    
     if not visible then
+        -- Minimize/Gizleme animasyonu: Aşağı kaydır ve küçült (Fluent tarzı)
         goalPosition = self.InitialPosition + UDim2.fromOffset(0, 30)
-    end
-    
-    -- Pencere Ana Çerçeve Animasyonu
-    Animate(self.Instance, {Position = goalPosition}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    
-    -- İçerik Şeffaflık Animasyonu (Sadece görünmez yaparken tetiklenmeli)
-    for _, child in ipairs(self.Instance:GetDescendants()) do
-        if child:IsA("GuiObject") and child.Name ~= "Shadow" then
-            -- GuiObject'leri sadece BackgroundTransparency/ImageTransparency için animasyonla
-            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                Animate(child, {TextTransparency = goalTransparency}, 0.3)
-                Animate(child, {BackgroundTransparency = goalTransparency}, 0.3)
-            elseif child:IsA("ImageLabel") then
-                Animate(child, {ImageTransparency = goalTransparency}, 0.3)
-            elseif not child:IsA("UIComponent") then
-                 Animate(child, {BackgroundTransparency = goalTransparency}, 0.3)
-            end
+        Animate(self.Instance, {Position = goalPosition, BackgroundTransparency = 1}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        -- İçeriği anında gizle (Animasyonun bitmesini beklemeye gerek yok)
+        for _, child in ipairs(self.Instance:GetDescendants()) do
+             if child:IsA("GuiObject") and child.Name ~= "Shadow" and child.Name ~= "MinimizeButton" then
+                 child.Visible = false
+             end
         end
+        if self.MinimizeButton then self.MinimizeButton.ImageTransparency = 0 end
+    else
+        -- Gösterme animasyonu
+        self.Instance.BackgroundTransparency = 0 -- Arka planı anında göster
+        
+        -- İçeriği anında göster
+        for _, child in ipairs(self.Instance:GetDescendants()) do
+             if child:IsA("GuiObject") and child.Name ~= "Shadow" and child.Name ~= "MinimizeButton" then
+                 child.Visible = true
+             end
+        end
+        
+        Animate(self.Instance, {Position = goalPosition}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        if self.MinimizeButton then self.MinimizeButton.ImageTransparency = 1 end
     end
-    Animate(self.Instance, {BackgroundTransparency = goalTransparency}, 0.3)
     
-    -- Remote Minimize Butonu görünürlüğünü yönetme
-    if self.MinimizeButton then
-        self.MinimizeButton.ImageTransparency = visible and 1 or 0
+    -- Minimize butonu ikonunu güncelle
+    local minButton = self.Instance:FindFirstChild("Header"):FindFirstChild("MinimizeWindowButton")
+    if minButton then
+        minButton.Text = visible and "_" or "^" -- Örnek ikon değiştirme
     end
 end
 
@@ -147,14 +150,13 @@ function WindowModule:Create(options)
         Name = "WindowFrame", Parent = screenGui, Size = config.Size,
         Position = config.InitialPosition or UDim2.fromScale(0.5, 0.5) - UDim2.fromOffset(config.Size.X.Offset / 2, config.Size.Y.Offset / 2),
         BackgroundColor3 = colors.Background, BorderSizePixel = 0, ClipsDescendants = true,
-        ZIndex = 1 -- Varsayılan ZIndex
+        ZIndex = 1
     })
     
     newWindow.Instance = windowFrame
     newWindow.InitialPosition = windowFrame.Position
     newWindow.Visible = true
 
-    -- Ana pencere için köşeler (smooth)
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = windowFrame })
 
     if config.ShadowEnabled then
@@ -171,16 +173,12 @@ function WindowModule:Create(options)
 
     local tabContainer = CreateInstance("Frame", { 
         Name = "TabContainer", Parent = windowFrame, 
-        -- Yükseklik: Toplam yükseklik - Header yüksekliği
         Size = UDim2.new(0, config.TabAreaWidth, 1, -config.HeaderHeight), 
-        -- Konum: Başlık Çubuğunun hemen altından başla
         Position = UDim2.new(0, 0, 0, config.HeaderHeight), 
         BackgroundColor3 = colors.Secondary, BorderSizePixel = 0, ZIndex = 2,
         ClipsDescendants = true
     })
 
-    -- Sol Tab Alanı Köşesi (Alt-Sol Köşe)
-    -- Üst sol köşe Başlık Çubuğu tarafından kontrol edildiği için sadece alt-sol yuvarlatılır
     CreateInstance("UICorner", { 
         CornerRadius = config.CornerRadius, 
         Parent = tabContainer,
@@ -212,54 +210,78 @@ function WindowModule:Create(options)
         Name = "Header", Parent = windowFrame, 
         Size = UDim2.new(1, 0, 0, config.HeaderHeight), 
         BackgroundColor3 = colors.Primary, BorderSizePixel = 0,
-        ZIndex = 3 -- Header her zaman üstte olmalı
+        ClipsDescendants = false, -- ÖĞE KAYBOLMASI DÜZELTMESİ: Header'da ClipDescendants'ı kapattık
+        ZIndex = 3
     })
     
-    -- Başlık Çubuğu Köşeleri (Üst-Sol ve Üst-Sağ)
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = header })
 
     local titleLabel = CreateInstance("TextLabel", { 
         Name = "Title", Parent = header, 
-        -- Genişlik: Toplam - Tab Genişliği - Boşluk
         Size = UDim2.new(1, -config.TabAreaWidth - 60, 1, 0), 
-        -- Konum: Tab Genişliği + Sağ boşluktan başla
         Position = UDim2.new(0, config.TabAreaWidth + 10, 0, 0), 
         Text = "<b>" .. config.Title .. "</b>",
-        RichText = true, Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = colors.Text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1 
+        RichText = true, Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = colors.Text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1,
+        ZIndex = 4
     })
 
     CreateInstance("TextLabel", { 
         Name = "SubTitle", Parent = titleLabel, 
         Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 0, 15), Text = config.SubTitle,
-        Font = Enum.Font.Gotham, TextSize = 10, TextColor3 = colors.SubText, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1 
+        Font = Enum.Font.Gotham, TextSize = 10, TextColor3 = colors.SubText, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1,
+        ZIndex = 4
     })
+
+    -- Butonların sağdan konumu
+    local buttonXOffset = config.HeaderHeight
 
     if config.Closable then
         local closeButton = CreateInstance("TextButton", { 
             Name = "CloseButton", Parent = header, 
             Size = UDim2.fromOffset(config.HeaderHeight, config.HeaderHeight),
-            Position = UDim2.new(1, -config.HeaderHeight, 0, 0), 
+            Position = UDim2.new(1, -buttonXOffset, 0, 0), 
             BackgroundColor3 = colors.Primary, Text = "X", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = colors.Text,
             ZIndex = 4
         })
         closeButton.MouseEnter:Connect(function() Animate(closeButton, {BackgroundColor3 = Color3.fromRGB(255, 80, 80)}, 0.2) end)
         closeButton.MouseLeave:Connect(function() Animate(closeButton, {BackgroundColor3 = colors.Primary}, 0.2) end)
         closeButton.MouseButton1Click:Connect(function() newWindow:Destroy() end)
+        buttonXOffset = buttonXOffset + config.HeaderHeight -- Sonraki butonun konumunu ayarla
     end
-
+    
+    -- Minimize Butonu
+    local minimizeButton = CreateInstance("TextButton", { 
+        Name = "MinimizeWindowButton", Parent = header, 
+        Size = UDim2.fromOffset(config.HeaderHeight, config.HeaderHeight),
+        Position = UDim2.new(1, -buttonXOffset, 0, 0), 
+        BackgroundColor3 = colors.Primary, Text = "_", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = colors.Text,
+        ZIndex = 4
+    })
+    minimizeButton.MouseEnter:Connect(function() Animate(minimizeButton, {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}, 0.2) end)
+    minimizeButton.MouseLeave:Connect(function() Animate(minimizeButton, {BackgroundColor3 = colors.Primary}, 0.2) end)
+    minimizeButton.MouseButton1Click:Connect(function() newWindow:Toggle() end)
+    
+    -- Sürükleme Mantığı (Hata çözülmüş hali)
     if config.Draggable then
         local dragging, dragStart, startPos
         header.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging, dragStart, startPos = true, input.Position, windowFrame.Position
                 windowFrame.ZIndex = 10 -- Sürüklerken üste taşı
-                local conn; conn = input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false; windowFrame.ZIndex = 1; conn:Disconnect() end end)
+                local conn; conn = input.Changed:Connect(function() 
+                    if input.UserInputState == Enum.UserInputState.End then 
+                        dragging = false; 
+                        windowFrame.ZIndex = 1; 
+                        conn:Disconnect() 
+                    end 
+                end)
             end
         end)
         UserInputService.InputChanged:Connect(function(input)
+            -- Sürükleme sırasında öğelerin kaybolmasını engelleyen şey:
+            -- Transparanlık animasyonu yapmamak ve ZIndex'i kontrol etmek.
             if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStart
-                -- Sürükleme sırasında ekranın dönmesini engelleyen şey budur: Mutlak offset kullanmak.
                 windowFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
         end)
@@ -269,13 +291,10 @@ function WindowModule:Create(options)
 
     -- #region ANA İÇERİK KONTEYNERİ (SAĞ TARAF)
 
-    -- Sağdaki içerik için ayrılan alanda padding bırakıyoruz (örneğin 10 birim)
     local padding = 10
     local contentContainer = CreateInstance("Frame", { 
         Name = "ContentContainer", Parent = windowFrame, 
-        -- Genişlik: Pencere Genişliği - Tab Genişliği - (2 * Padding)
         Size = UDim2.new(1, -config.TabAreaWidth - (2 * padding), 1, -config.HeaderHeight - (2 * padding)),
-        -- Konum: Tab Genişliği + Padding, Header Yüksekliği + Padding
         Position = UDim2.new(0, config.TabAreaWidth + padding, 0, config.HeaderHeight + padding), 
         BackgroundTransparency = 1,
         ZIndex = 1
@@ -292,18 +311,18 @@ function WindowModule:Create(options)
 
     -- Remote Minimize Butonu Ekleme
     if config.MinimizeMobileButton then
-        local minimizeButton = CreateInstance("ImageButton", {
+        local minimizeRemoteButton = CreateInstance("ImageButton", {
             Name = "MinimizeMobileButton", Parent = screenGui, 
             Size = UDim2.fromOffset(40, 40), Position = UDim2.fromScale(1, 0.05) - UDim2.fromOffset(50, 0),
             BackgroundTransparency = 1, Image = "rbxassetid://2526742566",
             ImageColor3 = colors.Accent, ZIndex = 10, ImageTransparency = 1 
         })
         
-        minimizeButton.MouseButton1Click:Connect(function()
+        minimizeRemoteButton.MouseButton1Click:Connect(function()
             newWindow:Toggle()
         end)
         
-        newWindow.MinimizeButton = minimizeButton
+        newWindow.MinimizeButton = minimizeRemoteButton
     end
 
     -- Açılış animasyonu
