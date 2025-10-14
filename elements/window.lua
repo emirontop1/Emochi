@@ -1,6 +1,7 @@
 --[[
     Emochi UI - Window Modülü (Sürükleme Hatası Giderildi ve Fluent Tarzı Minimize Tamamlandı)
 ]]
+local WindowModule = {}
 print("window.lua loaded sucsesfully")
 -- Roblox Servisleri
 local TweenService = game:GetService("TweenService")
@@ -50,7 +51,7 @@ local function Animate(instance, goal, duration, style, direction)
 end
 
 -- Pencere Metotları
-local WindowModule = {}
+
 
 local WindowProto = {}
 WindowProto.__index = WindowProto
