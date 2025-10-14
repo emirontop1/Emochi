@@ -63,3 +63,32 @@ function Window:AddTab(options)
 end
 
 return Window
+    self.Tabs = {}
+
+    print(string.format("[Window Module] '%s' Başlatıldı. Stil: Tema Rengi(%s), Easing(%s)", 
+        self.Title, self.ThemeColor, self.EasingStyle))
+    
+    -- Gerçek kodda, bu noktada pencere UI'ı yukarıdaki parametrelerle oluşturulur.
+    
+    return self
+end
+
+-- Animasyonlu Minimize İşlevi
+function Window:Minimize()
+    self.IsMinimized = not self.IsMinimized 
+    local targetPosition = self.IsMinimized and UDim2.fromScale(1.5, 0) or UDim2.fromScale(0.5, 0.5) -- Örnek pozisyonlar
+    
+    print(string.format("[Window] Minimization animasyonu başlatıldı. Süre: %.1fs, Stil: %s", 
+        self.AnimationTime, self.EasingStyle))
+    
+    -- Gerçek kodda: game:GetService("TweenService"):Create(self.Frame, TweenInfo.new(self.AnimationTime, self.EasingStyle), {Position = targetPosition}):Play()
+end
+
+function Window:AddTab(options)
+    if not AddTabFunction then error("AddTab fonksiyonu enjekte edilmedi.") end
+    local newTab = AddTabFunction(self, options) 
+    table.insert(self.Tabs, newTab)
+    return newTab
+end
+
+return Window
