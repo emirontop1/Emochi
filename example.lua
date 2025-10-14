@@ -1,5 +1,5 @@
 -- Emochi UI Kullanım Örneği
-local LOADER_URL = "https://raw.githubusercontent.com/emirontop1/Ligma/main/loader.lua"
+local LOADER_URL = "https://raw.githubusercontent.com/emirontop1/Emochi/main/loader.lua"
 local Emochi = loadstring(game:HttpGet(LOADER_URL))()
 
 local myWindow = Emochi.window:Create({
