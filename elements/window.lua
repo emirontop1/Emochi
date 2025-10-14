@@ -1,7 +1,7 @@
 --[[
     Emochi UI - Window Modülü (Sürükleme Hatası Giderildi ve Fluent Tarzı Minimize Tamamlandı)
 ]]
-
+print("window.lua loaded sucsesfully")
 -- Roblox Servisleri
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
