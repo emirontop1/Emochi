@@ -86,7 +86,12 @@ function WindowProto:SetVisible(visible)
     
     -- Remote Minimize Butonu animasyonu
     if self.MinimizeButton then
-        Animate(self.MinimizeButton, {ImageTransparency = goalTransparency}, 0.3)
+        -- Eğer pencere görünmez olacaksa butonu görünür yap, tersi durumda butonu gizle (sadece pencere tamamen kaybolduğunda)
+        if not visible then
+             Animate(self.MinimizeButton, {ImageTransparency = 0, BackgroundTransparency = 1}, 0.3)
+        else
+             Animate(self.MinimizeButton, {ImageTransparency = 1, BackgroundTransparency = 1}, 0.3)
+        end
     end
 end
 
@@ -128,12 +133,10 @@ function WindowModule:Create(options)
         InitialPosition = options.InitialPosition,
         ShadowEnabled = options.ShadowEnabled ~= nil and options.ShadowEnabled or true,
         BlurIntensity = options.BlurIntensity or 0,
-        -- Köşe radyanı biraz artırıldı
         CornerRadius = options.CornerRadius or UDim.new(0, 10), 
         HeaderHeight = options.HeaderHeight or 40,
-        -- Yeni opsiyon: Uzaktan küçültme butonu
         MinimizeMobileButton = options.MinimizeMobileButton ~= nil and options.MinimizeMobileButton or false, 
-        TabAreaHeight = options.TabAreaHeight or 40 -- Yeni opsiyon: Sekme alanı yüksekliği
+        TabAreaHeight = options.TabAreaHeight or 40
     }
 
     local colors = ThemeColors[config.Theme] or ThemeColors.Dark
@@ -154,7 +157,7 @@ function WindowModule:Create(options)
     newWindow.InitialPosition = windowFrame.Position
     newWindow.Visible = true
 
-    -- Ana pencere için köşeler
+    -- Ana pencere için köşeler (smooth)
     CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = windowFrame })
 
     if config.ShadowEnabled then
@@ -170,9 +173,8 @@ function WindowModule:Create(options)
     -- Header (Başlık Çubuğu)
     local header = CreateInstance("Frame", { Name = "Header", Parent = windowFrame, Size = UDim2.new(1, 0, 0, config.HeaderHeight), BackgroundColor3 = colors.Primary, BorderSizePixel = 0 })
 
-    -- Header'ın Alt Köşeleri (Ana pencere köşe radyanıyla uyumlu, üstte tam köşe)
-    CreateInstance("UICorner", { CornerRadius = config.CornerRadius, Parent = header })
-   -- CreateInstance("UIConstraint", { Parent = header }) -- Header'ın alt tarafını düz tutmak için farklı bir yapı kullanabiliriz, ancak bu bir başlangıç.
+    -- Header'ın sadece alt kenarlarını düz tutmak ve üst kenarlarını pencere ile birleştirmek için maskeleme.
+    -- Bu, pencerenin ana köşelerini kullanmasını sağlar.
 
     local titleLabel = CreateInstance("TextLabel", { Name = "Title", Parent = header, Size = UDim2.new(0.8, 0, 1, 0), Position = UDim2.new(0.03, 0, 0, -5), Text = "<b>" .. config.Title .. "</b>",
         RichText = true, Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = colors.Text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1 })
@@ -193,10 +195,9 @@ function WindowModule:Create(options)
         header.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging, dragStart, startPos = true, input.Position, windowFrame.Position
-                -- Pencereyi diğerlerinin üzerine taşı
-                windowFrame:GetParent():ClearAllChildren() -- ZIndex ayarları için
-                windowFrame.Parent = screenGui -- Tekrar en üste ekle
-                local conn; conn = input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false; conn:Disconnect() end end)
+                -- Pencereyi diğerlerinin üzerine taşımak için
+                windowFrame.ZIndex = 10 -- En üste çık
+                local conn; conn = input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false; windowFrame.ZIndex = 1; conn:Disconnect() end end)
             end
         end)
         UserInputService.InputChanged:Connect(function(input)
@@ -211,10 +212,7 @@ function WindowModule:Create(options)
     local tabContainer = CreateInstance("Frame", { Name = "TabContainer", Parent = windowFrame, Size = UDim2.new(1, 0, 0, config.TabAreaHeight),
         Position = UDim2.new(0, 0, 0, config.HeaderHeight), BackgroundColor3 = colors.Secondary, BorderSizePixel = 0, ZIndex = 2 })
 
-    -- Sekme Konteynerinin Alt Kısmı için Köşe (Opsiyonel olarak)
-    -- CreateInstance("UICorner", { CornerRadius = UDim.new(0, 5), Parent = tabContainer })
-
-    -- Ana İçerik Konteyneri (Tablar ve Kontroller buraya gelecek)
+    -- Ana İçerik Konteyneri (Kontroller buraya gelecek)
     local contentContainer = CreateInstance("Frame", { Name = "ContentContainer", Parent = windowFrame, 
         Size = UDim2.new(1, -20, 1, -config.HeaderHeight - config.TabAreaHeight - 10),
         Position = UDim2.new(0, 10, 0, config.HeaderHeight + config.TabAreaHeight + 5), 
@@ -232,8 +230,8 @@ function WindowModule:Create(options)
         local minimizeButton = CreateInstance("ImageButton", {
             Name = "MinimizeMobileButton", Parent = screenGui, 
             Size = UDim2.fromOffset(40, 40), Position = UDim2.fromScale(1, 0.05) - UDim2.fromOffset(50, 0),
-            BackgroundTransparency = 1, Image = "rbxassetid://2526742566", -- Örnek bir ikon (Dişli, Ayar vs.)
-            ImageColor3 = colors.Accent, ZIndex = 10 
+            BackgroundTransparency = 1, Image = "rbxassetid://2526742566", -- Örnek ikon
+            ImageColor3 = colors.Accent, ZIndex = 10, ImageTransparency = 1 -- Başlangıçta gizli
         })
         
         minimizeButton.MouseButton1Click:Connect(function()
