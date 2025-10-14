@@ -50,6 +50,8 @@ local function Animate(instance, goal, duration, style, direction)
 end
 
 -- Pencere Metotları
+local WindowModule = {}
+
 local WindowProto = {}
 WindowProto.__index = WindowProto
 
