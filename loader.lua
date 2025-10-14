@@ -15,7 +15,7 @@ local Emochi = shared.Emochi_UI
 local components = {"window"} -- Gelecekte buraya "button", "slider" gibi elemanlar ekleyebilirsiniz.
 
 for _, name in ipairs(components) do
-    local url = "https://raw.githubusercontent.com/emirontop1/Ligma/main/elements/" .. name .. ".lua"
+    local url = "https://raw.githubusercontent.com/emirontop1/Emochi/main/elements/" .. name .. ".lua"
     local success, module = pcall(function()
         return loadstring(game:HttpGet(url))()
     end)
@@ -27,3 +27,5 @@ for _, name in ipairs(components) do
 end
 
 return Emochi
+
+--[[:<]]
