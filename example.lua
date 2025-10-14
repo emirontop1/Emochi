@@ -1,16 +1,17 @@
--- Emochi UI Kullanım Örneği
+-- Emochi Loader'ı yükle
 local LOADER_URL = "https://raw.githubusercontent.com/emirontop1/Emochi/refs/heads/main/loader.lua"
 local Emochi = loadstring(game:HttpGet(LOADER_URL))()
 
+-- Yeni pencere oluştur (tüm özellikler açık)
 local myWindow = Emochi.window:Create({
-    Title = "Yeni Menü",
-    Theme = "Dracula",
-    Size = UDim2.fromOffset(700, 500),
-    MinimizeMobileButton = true, -- Uzaktan küçültme butonu eklendi
-    CornerRadius = UDim.new(0, 15) -- Daha da smooth köşeler
+    Title = "Tam Feature Kontrol Paneli",
+    SubTitle = "v1.0 - Demo",
+    Theme = "Dracula",            -- Temalar: Dark, Light, Dracula
+    Size = UDim2.fromOffset(750, 550),
+    Draggable = true,              -- Sürüklenebilir
+    Closable = true,               -- Kapatılabilir
+    MinimizeKey = Enum.KeyCode.RightControl, -- Kısayol ile minimize/restore
+    MinimizeMobileButton = true,   -- Mobil / uzak minimize butonu
 })
 
--- Kontrolleri eskisi gibi myWindow.Container içine eklemeye devam edebilirsiniz
--- Örneğin:
--- local button = Instance.new("TextButton")
--- button.Parent = myWindow.Container
+-- Tab alanına buton ekleme
