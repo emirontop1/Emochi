@@ -372,14 +372,8 @@ function EmocX:CreateWindow(title, opts)
 
     btnMin.MouseButton1Click:Connect(function() window:ToggleMinimize() end)
     btnClose.MouseButton1Click:Connect(function()
-        -- close animation
-        local t = TweenService:Create(root, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0,0,0,0)})
-        t:Play()
-        t.Completed:Connect(function()
-            if sg and sg.Parent then
-                pcall(function() sg:Destroy() end)
-            end
-        end)
+        TweenService:Create(root, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0,0,0,0)}):Play()
+        task.delay(0.18, function() if sg and sg.Parent then sg:Destroy() end end)
     end)
 
     -- Create default tab (Home)
