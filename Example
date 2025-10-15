@@ -1,0 +1,77 @@
+-- EmocX_usage.lua
+-- Örnek: loadstring ile EmocX kullanımı
+-- RAW_URL'i GitHub raw URL'in ile değiştir
+
+local RAW_URL = "https://raw.githubusercontent.com/emirontop1/Emochi/refs/heads/main/Src"
+
+-- basit fetch (executor'lara göre farklı isimler olabilir)
+local function fetch(url)
+    if game.HttpGet then
+        return game:HttpGet(url, true)
+    elseif (syn and syn.request) then
+        local r = syn.request({Url = url, Method = "GET"})
+        return r.Body
+    else
+        error("HTTP fetch method not available in this environment.")
+    end
+end
+
+local suc, code = pcall(fetch, RAW_URL)
+if not suc then
+    error("EmocX yüklenemedi: "..tostring(code))
+end
+
+local EmocX = loadstring(code)()
+-- EmocX hazır
+
+-- Örnek: Key sistemiyle doğrulama (örnek remote yok; local key kullan)
+local function onKeyResult(ok, where)
+    if ok then
+        print("Key doğrulandı:", where)
+        -- loader göster, sonra arayüzü başlat
+        local parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+        local loader = EmocX.CreateLoadingScreen(parent, {title = "EmocX Başlatılıyor", sub = "Bileşenler yükleniyor..."})
+        for i=0,1,0.12 do loader:SetProgress(i); task.wait(0.06) end
+        loader:Finish()
+
+        -- Window oluştur
+        local win = EmocX:CreateWindow("EmocX Hub", {size = Vector2.new(720,480)})
+        -- Tab oluştur ve örnek elemanlar ekle
+        local mainTab = win:CreateTab("Main")
+        local ma9inTab = win:CreateTab("Maijon")
+        local maionTab = win:CreateTab("Main")
+
+
+        mainTab:CreateLabel("Hoşgeldin! EmocX hazır.")
+        mainTab:CreateButton("Bildirim Göster", function() win:Notify({text = "Bu bir örnek bildirimi."}) end)
+        local t = mainTab:CreateToggle("God Mode", false, function(state) print("God Mode:", state) end)
+        local s = mainTab:CreateSlider("WalkSpeed", 16, 300, 16, function(val) 
+            local pl = game.Players.LocalPlayer
+            if pl and pl.Character and pl.Character:FindFirstChild("Humanoid") then
+                pcall(function() pl.Character.Humanoid.WalkSpeed = val end)
+            end
+        end)
+
+        -- Konfigürasyon kaydet örneği
+        -- win:SaveConfig("myconfig") -- (örnek - boş veri kaydeder; istersen geliştireyim)
+
+    else
+        warn("Key doğrulama başarısız:", where)
+        -- alternatif: kullanıcıya prompt göster
+        EmocX:PromptKey(nil, {title = "EmocX Key", placeholder = "Anahtarınızı girin"}, function(ok2, where2)
+            if ok2 then
+                print("Key validated via prompt:", where2)
+                -- tekrar başlat logic (basitleştirilmiş)
+            else
+                warn("Key invalid; exit.")
+            end
+        end)
+    end
+end
+
+-- Doğrulama: local key kontrolü (örnek)
+-- Burada EmocX._localKeys içinde bulunan bir anahtarı konsolda deneyebilirsin.
+-- Kullanıcı deneyimi için PromptKey açalım ve sonrasında onKeyResult çağırılacak
+EmocX:PromptKey(nil, {title = "EmocX - Key Required", placeholder = "EMOCX-FULL-0001"}, function(ok, where) 
+    onKeyResult(ok, where)
+end)
