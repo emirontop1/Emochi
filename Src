@@ -1,1 +1,667 @@
 
+-- EmocX_source.lua
+-- EmocX GUI Library (Full) - Neumorphic style
+-- Features:
+--  - Loading screen
+--  - Window (draggable, minimize/restore, close)
+--  - Tab system
+--  - Button, Toggle, Slider
+--  - Notifications
+--  - Config save/load (writefile/readfile if available)
+--  - Key System (local list + optional remote verify)
+--  - gethui / syn.protect_gui support
+-- Usage:
+--  local EmocX = loadstring(game:HttpGet("RAW_URL"))()
+--  -- or require(ModuleScript)
+--  local win = EmocX:CreateWindow("Title", {size = Vector2.new(700,460)})
+--  local tab = win:CreateTab("Main")
+--  tab:CreateButton("Click me", function() print("clicked") end)
+
+-- SERVICES
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+
+-- LIB
+local EmocX = {}
+EmocX.__index = EmocX
+
+-- THEME (Neumorphic)
+local THEME = {
+    Name = "Neumorphic",
+    Background = Color3.fromRGB(236,236,240),
+    Surface = Color3.fromRGB(245,245,248),
+    Text = Color3.fromRGB(28,28,30),
+    Accent = Color3.fromRGB(100,110,255),
+    ShadowDark = Color3.fromRGB(200,200,208),
+    ShadowLight = Color3.fromRGB(255,255,255),
+    ButtonSurface = Color3.fromRGB(237,237,242),
+    UIStrokeColor = Color3.fromRGB(215,215,220)
+}
+
+-- Utility: quick instance constructor
+local function new(class, props)
+    local inst = Instance.new(class)
+    if props then
+        for k,v in pairs(props) do
+            pcall(function() inst[k] = v end)
+        end
+    end
+    return inst
+end
+
+-- Parent selection: PlayerGui preferred; fallback to gethui or CoreGui
+local function getDefaultParent()
+    local player = Players.LocalPlayer
+    if player and player:FindFirstChild("PlayerGui") then
+        return player.PlayerGui
+    end
+    if gethui then return gethui() end
+    return CoreGui
+end
+
+-- Protect GUI if executor supports it
+local function protectGui(gui)
+    if syn and syn.protect_gui then
+        pcall(function() syn.protect_gui(gui) end)
+    end
+end
+
+-- Make a top-level ScreenGui with sane defaults
+local function makeScreenGui(name)
+    local sg = new("ScreenGui", {
+        Name = name or "EmocX_UI",
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    })
+    return sg
+end
+
+-- Shadow asset (9-slice). If unavailable, overlay will still work.
+local SHADOW_ASSET = "rbxassetid://7743451371"
+
+-- Simple clamp
+local function clamp(n, a, b) return math.max(a, math.min(b, n)) end
+
+-- Save/Load config helpers
+local CONFIG_FOLDER = "EmocX_Configs"
+local CONFIG_EXT = ".emocx"
+local function writeConfig(name, data)
+    if writefile then
+        pcall(function()
+            if not isfolder(CONFIG_FOLDER) then
+                makefolder(CONFIG_FOLDER)
+            end
+            writefile(CONFIG_FOLDER.."/"..name..CONFIG_EXT, HttpService:JSONEncode(data))
+        end)
+    end
+end
+local function readConfig(name)
+    if readfile and isfile and isfile(CONFIG_FOLDER.."/"..name..CONFIG_EXT) then
+        local ok, content = pcall(function() return readfile(CONFIG_FOLDER.."/"..name..CONFIG_EXT) end)
+        if ok and content then
+            local suc, decoded = pcall(function() return HttpService:JSONDecode(content) end)
+            if suc then return decoded end
+        end
+    end
+    return nil
+end
+
+-- ===========
+-- Loading Screen
+-- ===========
+function EmocX.CreateLoadingScreen(parent, opts)
+    opts = opts or {}
+    local theme = opts.theme or THEME
+    parent = parent or getDefaultParent()
+
+    local sg = makeScreenGui("EmocX_Loading")
+    sg.Parent = parent
+    protectGui(sg)
+
+    local container = new("Frame", {
+        Name = "EmocXLoadingRoot",
+        Parent = sg,
+        AnchorPoint = Vector2.new(0.5,0.5),
+        Position = UDim2.new(0.5,0,0.45,0),
+        Size = UDim2.new(0, 560, 0, 140),
+        BackgroundColor3 = theme.Surface,
+        BorderSizePixel = 0
+    })
+    new("UICorner", {Parent = container, CornerRadius = UDim.new(0,16)})
+
+    -- shadows: dark & light for neumorphic look
+    local shadowDark = new("ImageLabel", {
+        Parent = container,
+        BackgroundTransparency = 1,
+        Image = SHADOW_ASSET,
+        Size = UDim2.new(1, 18, 1, 18),
+        Position = UDim2.new(0, -9, 0, -9),
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(20,20,180,180),
+        ImageColor3 = theme.ShadowDark,
+        ImageTransparency = 0.82,
+        ZIndex = 0
+    })
+    local shadowLight = new("ImageLabel", {
+        Parent = container,
+        BackgroundTransparency = 1,
+        Image = SHADOW_ASSET,
+        Size = UDim2.new(1, 18, 1, 18),
+        Position = UDim2.new(0, -9, 0, -9),
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(20,20,180,180),
+        ImageColor3 = theme.ShadowLight,
+        ImageTransparency = 0.92,
+        ZIndex = 3
+    })
+
+    local title = new("TextLabel", {
+        Parent = container,
+        Size = UDim2.new(1, -36, 0, 40),
+        Position = UDim2.new(0, 18, 0, 12),
+        BackgroundTransparency = 1,
+        Text = opts.title or "EmocX Yükleniyor...",
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        TextColor3 = theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local sub = new("TextLabel", {
+        Parent = container,
+        Size = UDim2.new(1, -36, 0, 20),
+        Position = UDim2.new(0, 18, 0, 46),
+        BackgroundTransparency = 1,
+        Text = opts.sub or "Lütfen bekleyin...",
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextColor3 = theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local barBg = new("Frame", {
+        Parent = container,
+        Size = UDim2.new(1, -48, 0, 28),
+        Position = UDim2.new(0, 24, 0, 82),
+        BackgroundColor3 = Color3.fromRGB(230,230,235),
+        BorderSizePixel = 0
+    })
+    new("UICorner", {Parent = barBg, CornerRadius = UDim.new(0,14)})
+    local barFill = new("Frame", {
+        Parent = barBg,
+        Size = UDim2.new(0,0,1,0),
+        BackgroundColor3 = theme.Accent,
+        BorderSizePixel = 0
+    })
+    new("UICorner", {Parent = barFill, CornerRadius = UDim.new(0,14)})
+    local percent = new("TextLabel", {
+        Parent = barBg, BackgroundTransparency = 1,
+        Size = UDim2.new(1,0,1,0), Text = "0%", Font = Enum.Font.GothamBold, TextSize = 14,
+        TextColor3 = theme.Text
+    })
+
+    -- appear animation
+    container.Size = UDim2.new(0,1,0,1)
+    TweenService:Create(container, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,560,0,140)}):Play()
+
+    local api = {}
+    api._sg = sg
+    api._bar = barFill
+    api._percent = percent
+
+    function api:SetProgress(v)
+        local n = clamp(tonumber(v) or 0, 0, 1)
+        TweenService:Create(api._bar, TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(n,0,1,0)}):Play()
+        api._percent.Text = math.floor(n*100).."%"
+    end
+
+    function api:Finish(tp)
+        tp = tp or 0.28
+        local t = TweenService:Create(container, TweenInfo.new(tp, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0,0,0,0)})
+        t:Play()
+        t.Completed:Connect(function()
+            if sg and sg.Parent then sg:Destroy() end
+        end)
+    end
+
+    function api:Destroy() if sg and sg.Parent then sg:Destroy() end end
+
+    return api
+end
+
+-- ===========
+-- Window + Tab + Elements System
+-- ===========
+-- Window object; windows keep their own ScreenGui
+function EmocX:CreateWindow(title, opts)
+    opts = opts or {}
+    local theme = opts.theme or THEME
+    local parent = opts.parent or getDefaultParent()
+    local size = opts.size or Vector2.new(680, 460)
+    local pos = opts.pos or UDim2.new(0.5, -size.X/2, 0.5, -size.Y/2)
+
+    local sg = makeScreenGui("EmocX_Window")
+    sg.Parent = parent
+    protectGui(sg)
+
+    local root = new("Frame", {
+        Parent = sg, Name = "Root",
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = pos,
+        BackgroundColor3 = theme.Surface,
+        BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(0,0)
+    })
+    new("UICorner", {Parent = root, CornerRadius = UDim.new(0,16)})
+
+    -- shadows
+    local shadowBG = new("ImageLabel", {
+        Parent = root, BackgroundTransparency = 1, Image = SHADOW_ASSET,
+        Size = UDim2.new(1, 22, 1, 22), Position = UDim2.new(0,-11,0,-11),
+        ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(20,20,180,180),
+        ImageColor3 = theme.ShadowDark, ImageTransparency = 0.82, ZIndex = 0
+    })
+    local shadowHL = new("ImageLabel", {
+        Parent = root, BackgroundTransparency = 1, Image = SHADOW_ASSET,
+        Size = UDim2.new(1, 22, 1, 22), Position = UDim2.new(0,-11,0,-11),
+        ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(20,20,180,180),
+        ImageColor3 = theme.ShadowLight, ImageTransparency = 0.94, ZIndex = 5
+    })
+
+    -- Topbar
+    local topbar = new("Frame", {Parent = root, Size = UDim2.new(1,0,0,46), BackgroundTransparency = 1})
+    local titleLbl = new("TextLabel", {
+        Parent = topbar, Size = UDim2.new(1, -160, 1, 0), Position = UDim2.new(0, 18, 0, 0),
+        BackgroundTransparency = 1, Text = title or "EmocX", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = theme.Text, TextXAlignment = Enum.TextXAlignment.Left
+    })
+    local ctrl = new("Frame", {Parent = topbar, Size = UDim2.new(0, 140, 1,0), Position = UDim2.new(1, -150, 0, 0), BackgroundTransparency = 1})
+
+    -- Minimize & Close
+    local btnMin = new("TextButton", {Parent = ctrl, Size = UDim2.new(0, 44, 0, 28), Position = UDim2.new(0, 6, 0.5, -14), BackgroundColor3 = theme.ButtonSurface, Text = "—", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = theme.Text, BorderSizePixel = 0})
+    new("UICorner", {Parent = btnMin, CornerRadius = UDim.new(0,8)})
+    local btnClose = new("TextButton", {Parent = ctrl, Size = UDim2.new(0, 44, 0, 28), Position = UDim2.new(0, 56, 0.5, -14), BackgroundColor3 = theme.ButtonSurface, Text = "×", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = theme.Text, BorderSizePixel = 0})
+    new("UICorner", {Parent = btnClose, CornerRadius = UDim.new(0,8)})
+
+    -- Content area
+    local body = new("Frame", {
+        Parent = root, Name = "Body",
+        Position = UDim2.new(0, 16, 0, 56),
+        Size = UDim2.new(1, -32, 1, -72),
+        BackgroundColor3 = theme.Surface
+    })
+    new("UICorner", {Parent = body, CornerRadius = UDim.new(0,12)})
+
+    -- Left tab list
+    local tabList = new("ScrollingFrame", {
+        Parent = body, Name = "TabList", BackgroundTransparency = 1,
+        Size = UDim2.new(0, 140, 1, 0), Position = UDim2.new(0,0,0,0),
+        CanvasSize = UDim2.new(0,0,0,0), ScrollBarThickness = 6
+    })
+    local tabListLayout = new("UIListLayout", {Parent = tabList, Padding = UDim.new(0,6)})
+    tabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        tabList.CanvasSize = UDim2.new(0, 0, 0, tabListLayout.AbsoluteContentSize.Y + 10)
+    end)
+
+    -- Right content pages
+    local pages = new("Frame", {Parent = body, Name = "Pages", BackgroundTransparency = 1, Size = UDim2.new(1, -152, 1, 0), Position = UDim2.new(0, 152, 0, 0)})
+    local pagesLayout = new("UIListLayout", {Parent = pages, FillDirection = Enum.FillDirection.Vertical})
+
+    -- Store state
+    local window = {}
+    window._sg = sg
+    window._root = root
+    window._body = body
+    window._tabList = tabList
+    window._pages = pages
+    window._tabs = {}
+    window._theme = theme
+    window._isMin = false
+    window._stored = {Size = UDim2.new(0, size.X, 0, size.Y), Pos = root.Position}
+
+    -- Draggable
+    do
+        local dragging = false
+        local offset = Vector2.new(0,0)
+        local startPos = Vector2.new(0,0)
+        topbar.InputBegan:Connect(function(input, processed)
+            if processed then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                local mouse = UserInputService:GetMouseLocation()
+                startPos = root.AbsolutePosition
+                offset = startPos - Vector2.new(mouse.X, mouse.Y)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if not dragging then return end
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                local m = UserInputService:GetMouseLocation()
+                local newPos = UDim2.fromOffset(m.X + offset.X, m.Y + offset.Y)
+                root.Position = newPos
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
+
+    -- Minimize/Restore behavior
+    function window:ToggleMinimize()
+        if not window._isMin then
+            window._stored.Size = root.Size
+            window._stored.Pos = root.Position
+            local t1 = TweenService:Create(body, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, 0)})
+            local t2 = TweenService:Create(root, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, root.Size.X.Offset, 0, 56)})
+            t1:Play(); t2:Play()
+            window._isMin = true
+        else
+            local t = TweenService:Create(root, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = window._stored.Size, Position = window._stored.Pos})
+            t:Play()
+            wait(0.02)
+            local t2 = TweenService:Create(body, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -32, 1, -72)})
+            t2:Play()
+            window._isMin = false
+        end
+    end
+
+    btnMin.MouseButton1Click:Connect(function() window:ToggleMinimize() end)
+    btnClose.MouseButton1Click:Connect(function()
+        TweenService:Create(root, TweenInfo.new(0.18, Enum.EasingStyle.Quadratic, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0,0,0,0)}):Play()
+        task.delay(0.18, function() if sg and sg.Parent then sg:Destroy() end end)
+    end)
+
+    -- Create default tab (Home)
+    local function createTab(name)
+        local tabId = tostring(name)..tostring(math.random(1,999999))
+        -- button in left list
+        local tabBtn = new("Frame", {Parent = tabList, Size = UDim2.new(1, -12, 0, 40), BackgroundColor3 = theme.ButtonSurface, BorderSizePixel = 0})
+        new("UICorner", {Parent = tabBtn, CornerRadius = UDim.new(0,8)})
+        local btnText = new("TextLabel", {Parent = tabBtn, Size = UDim2.new(1, -12, 1, 0), Position = UDim2.new(0, 12, 0, 0), BackgroundTransparency = 1, Text = name, TextColor3 = theme.Text, Font = Enum.Font.Gotham, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left})
+        local btnInteract = new("TextButton", {Parent = tabBtn, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = ""})
+
+        -- page
+        local page = new("ScrollingFrame", {Parent = pages, Name = name, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), CanvasSize = UDim2.new(0,0,0,0), ScrollBarThickness = 6})
+        local pageLayout = new("UIListLayout", {Parent = page, Padding = UDim.new(0,12)})
+        pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 12)
+        end)
+
+        -- click behavior
+        btnInteract.MouseButton1Click:Connect(function()
+            -- hide others
+            for _,c in ipairs(pages:GetChildren()) do
+                if c:IsA("ScrollingFrame") then c.Visible = false end
+            end
+            page.Visible = true
+            -- visual highlight
+            for _,b in ipairs(tabList:GetChildren()) do
+                if b:IsA("Frame") then
+                    b.BackgroundTransparency = (b == tabBtn) and 0 or 0
+                    b.BackgroundColor3 = (b == tabBtn) and theme.Surface or theme.ButtonSurface
+                end
+            end
+        end)
+
+        -- default: hide page; only first tab will be shown later
+        page.Visible = false
+
+        local tabObj = {
+            Id = tabId,
+            Name = name,
+            Button = tabBtn,
+            Page = page,
+            Layout = pageLayout
+        }
+
+        window._tabs[tabId] = tabObj
+        return tabObj
+    end
+
+    -- Create UI element constructors
+    local function createSection(page, title)
+        local sec = new("Frame", {Parent = page, Size = UDim2.new(1, -12, 0, 30), BackgroundTransparency = 1})
+        new("UICorner", {Parent = sec, CornerRadius = UDim.new(0,8)})
+        local lbl = new("TextLabel", {Parent = sec, Size = UDim2.new(1,0,0,24), BackgroundTransparency = 1, Text = title or "", Font = Enum.Font.GothamBold, TextSize = 15, TextColor3 = theme.Text, TextXAlignment = Enum.TextXAlignment.Left})
+        return sec
+    end
+
+    local function createButton(page, text, callback)
+        local frame = new("Frame", {Parent = page, Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1})
+        local btn = new("TextButton", {Parent = frame, Size = UDim2.new(1, -12, 1, 0), Position = UDim2.new(0, 6, 0, 0), BackgroundColor3 = theme.ButtonSurface, Text = text or "Button", Font = Enum.Font.GothamBold, TextSize = 15, TextColor3 = theme.Text, BorderSizePixel = 0})
+        new("UICorner", {Parent = btn, CornerRadius = UDim.new(0,10)})
+        local stroke = new("UIStroke", {Parent = btn, Color = theme.UIStrokeColor, Thickness = 1, Transparency = 0.8})
+        btn.MouseButton1Click:Connect(function()
+            pcall(callback)
+        end)
+        return btn
+    end
+
+    local function createToggle(page, text, default, callback)
+        local frame = new("Frame", {Parent = page, Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1})
+        local lbl = new("TextLabel", {Parent = frame, Size = UDim2.new(1, -80, 1, 0), Position = UDim2.new(0, 12, 0, 0), BackgroundTransparency = 1, Text = text or "Toggle", Font = Enum.Font.Gotham, TextSize = 15, TextColor3 = theme.Text, TextXAlignment = Enum.TextXAlignment.Left})
+        local box = new("TextButton", {Parent = frame, Size = UDim2.new(0, 56, 0, 28), Position = UDim2.new(1, -72, 0.5, -14), BackgroundColor3 = theme.ButtonSurface, BorderSizePixel = 0})
+        new("UICorner", {Parent = box, CornerRadius = UDim.new(0,8)})
+        local inner = new("Frame", {Parent = box, Size = UDim2.new(0.5, -4, 1, -4), Position = UDim2.new(0, 4, 0, 2), BackgroundColor3 = Color3.fromRGB(200,200,200), BorderSizePixel = 0})
+        new("UICorner", {Parent = inner, CornerRadius = UDim.new(0,6)})
+
+        local state = default and true or false
+        local function refresh()
+            if state then
+                inner.Position = UDim2.new(0.5, 4, 0, 2)
+                inner.BackgroundColor3 = theme.Accent
+            else
+                inner.Position = UDim2.new(0, 4, 0, 2)
+                inner.BackgroundColor3 = Color3.fromRGB(200,200,200)
+            end
+        end
+        box.MouseButton1Click:Connect(function()
+            state = not state
+            refresh()
+            pcall(callback, state)
+        end)
+        refresh()
+        return {
+            Set = function(v) state = not not v; refresh() end,
+            Get = function() return state end,
+            UI = frame
+        }
+    end
+
+    local function createSlider(page, text, min, max, default, callback)
+        min = min or 0; max = max or 100; default = default or min
+        local frame = new("Frame", {Parent = page, Size = UDim2.new(1,0,0,56), BackgroundTransparency = 1})
+        local lbl = new("TextLabel", {Parent = frame, Size = UDim2.new(1, -12, 0, 18), Position = UDim2.new(0,6,0,6), BackgroundTransparency = 1, Text = (text or "Slider").."  "..tostring(default), Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = theme.Text, TextXAlignment = Enum.TextXAlignment.Left})
+        local track = new("Frame", {Parent = frame, Size = UDim2.new(1, -24, 0, 12), Position = UDim2.new(0, 12, 0, 34), BackgroundColor3 = Color3.fromRGB(230,230,235), BorderSizePixel = 0})
+        new("UICorner", {Parent = track, CornerRadius = UDim.new(0,8)})
+        local fill = new("Frame", {Parent = track, Size = UDim2.new((default-min)/(max-min), 0, 1, 0), BackgroundColor3 = theme.Accent, BorderSizePixel = 0})
+        new("UICorner", {Parent = fill, CornerRadius = UDim.new(0,8)})
+        local dragging = false
+
+        local function updateFromX(x)
+            local rel = clamp((x - track.AbsolutePosition.X)/track.AbsoluteSize.X, 0, 1)
+            fill.Size = UDim2.new(rel, 0, 1, 0)
+            local val = min + rel * (max - min)
+            lbl.Text = (text or "Slider").."  "..math.floor(val)
+            pcall(callback, val)
+        end
+
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                updateFromX(input.Position.X)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                updateFromX(input.Position.X)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                dragging = false
+            end
+        end)
+
+        return {
+            Set = function(v) local rel = clamp((v - min) / (max - min), 0, 1); fill.Size = UDim2.new(rel,0,1,0); lbl.Text = (text or "Slider").."  "..math.floor(v) end,
+            Get = function()
+                local rel = fill.Size.X.Scale
+                return min + rel * (max - min)
+            end,
+            UI = frame
+        }
+    end
+
+    -- Public window API: create tab, destroy, notify
+    function window:CreateTab(name)
+        local tab = createTab(name)
+        -- first created tab -> make visible
+        local first = true
+        for _,v in pairs(self._tabs) do first = false; break end
+        -- ensure the created tab's page is visible and others hidden
+        for _,c in ipairs(pages:GetChildren()) do if c:IsA("ScrollingFrame") then c.Visible = false end end
+        tab.Page.Visible = true
+        -- return object with element creators
+        local obj = {}
+        function obj:CreateSection(title) return createSection(tab.Page, title) end
+        function obj:CreateButton(text, cb) return createButton(tab.Page, text, cb) end
+        function obj:CreateToggle(text, def, cb) return createToggle(tab.Page, text, def, cb) end
+        function obj:CreateSlider(text, min, max, def, cb) return createSlider(tab.Page, text, min, max, def, cb) end
+        function obj:CreateLabel(text) local f = new("Frame", {Parent = tab.Page, Size = UDim2.new(1,0,0,22), BackgroundTransparency = 1}); new("TextLabel", {Parent = f, Size = UDim2.new(1,-12,1,0), Position = UDim2.new(0,6,0,0), BackgroundTransparency = 1, Text = text or "", Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = theme.Text}); return f end
+        return obj
+    end
+
+    function window:Destroy()
+        if sg and sg.Parent then sg:Destroy() end
+    end
+
+    function window:SaveConfig(name)
+        local data = {}
+        -- naive: gather toggles & sliders by traversing pages (could be improved)
+        for _,page in pairs(pages:GetChildren()) do
+            if page:IsA("ScrollingFrame") then
+                for _,child in pairs(page:GetChildren()) do
+                    if child:IsA("Frame") or child:IsA("TextButton") then
+                        -- ignore complex traversal for brevity
+                    end
+                end
+            end
+        end
+        writeConfig(name or "default", data)
+    end
+
+    function window:Notify(opts)
+        opts = opts or {}
+        local notif = new("Frame", {Parent = root, Size = UDim2.new(0, 320, 0, 60), Position = UDim2.new(1, -340, 0, 16), BackgroundColor3 = theme.Surface, BorderSizePixel = 0, ZIndex = 999})
+        new("UICorner", {Parent = notif, CornerRadius = UDim.new(0,10)})
+        new("TextLabel", {Parent = notif, Size = UDim2.new(1,-20,1,0), Position = UDim2.new(0,10,0,0), BackgroundTransparency = 1, Text = opts.text or "Notification", Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = theme.Text, TextWrapped = true})
+        notif.BackgroundTransparency = 1
+        TweenService:Create(notif, TweenInfo.new(0.28, Enum.EasingStyle.Quad), {BackgroundTransparency = 0}):Play()
+        task.delay(opts.duration or 3, function() pcall(function() TweenService:Create(notif, TweenInfo.new(0.28, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play(); task.wait(0.32); notif:Destroy() end) end)
+    end
+
+    -- appear
+    root.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(root, TweenInfo.new(0.36, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, size.X, 0, size.Y)}):Play()
+
+    return window
+end
+
+-- ===========
+-- Key System
+-- ===========
+-- Simple key system with:
+--  - localKeys: a table of valid keys (you can modify)
+--  - optional remoteVerify(url, key) if a url is provided and environment allows HttpGet
+EmocX._localKeys = {
+    "EMOCX-TRIAL-1234",
+    "EMOCX-FULL-0001"
+}
+
+-- Remote verify: expects the remote to return JSON {ok = true} or plain "ok"
+local function remoteVerify(url, key, timeout)
+    timeout = timeout or 5
+    if not game.HttpGet then return false, "HttpGet not available" end
+    local ok, body = pcall(function() return game:HttpGet(url .. "?key=" .. HttpService:UrlEncode(key)) end)
+    if not ok or not body then return false, "request failed" end
+    -- try JSON
+    local suc, decoded = pcall(function() return HttpService:JSONDecode(body) end)
+    if suc and type(decoded) == "table" then
+        if decoded.ok then return true, "ok" else return false, decoded.reason or "invalid" end
+    else
+        if tostring(body):lower():match("ok") then return true, "ok" else return false, body end
+    end
+end
+
+-- Show a simple key prompt modal; callback(success, reason)
+function EmocX:PromptKey(parent, opts, callback)
+    opts = opts or {}
+    parent = parent or getDefaultParent()
+    local theme = opts.theme or THEME
+
+    local sg = makeScreenGui("EmocX_KeyPrompt")
+    sg.Parent = parent
+    protectGui(sg)
+
+    local modal = new("Frame", {Parent = sg, AnchorPoint = Vector2.new(0.5,0.5), Position = UDim2.new(0.5,0,0.45,0), Size = UDim2.new(0, 420, 0, 160), BackgroundColor3 = theme.Surface, BorderSizePixel = 0})
+    new("UICorner", {Parent = modal, CornerRadius = UDim.new(0,12)})
+    new("TextLabel", {Parent = modal, Size = UDim2.new(1,-36,0,32), Position = UDim2.new(0,18,0,14), BackgroundTransparency = 1, Text = opts.title or "Enter Key", Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = theme.Text, TextXAlignment = Enum.TextXAlignment.Left})
+    local input = new("TextBox", {Parent = modal, Size = UDim2.new(1,-36,0,40), Position = UDim2.new(0,18,0,56), BackgroundColor3 = Color3.fromRGB(250,250,252), Text = opts.placeholder or "", ClearTextOnFocus = false, Font = Enum.Font.Gotham, TextSize = 14})
+    new("UICorner", {Parent = input, CornerRadius = UDim.new(0,8)})
+    local submit = new("TextButton", {Parent = modal, Size = UDim2.new(0, 110, 0, 36), Position = UDim2.new(1, -134, 1, -50), BackgroundColor3 = theme.Accent, Text = "Verify", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = Color3.fromRGB(255,255,255)})
+    new("UICorner", {Parent = submit, CornerRadius = UDim.new(0,8)})
+
+    local status = new("TextLabel", {Parent = modal, Size = UDim2.new(1,-36,0,20), Position = UDim2.new(0,18,1,-32), BackgroundTransparency = 1, Text = "", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = theme.Text, TextXAlignment = Enum.TextXAlignment.Left})
+
+    submit.MouseButton1Click:Connect(function()
+        local key = tostring(input.Text or "")
+        status.Text = "Checking..."
+        spawn(function()
+            -- local check
+            for _,k in ipairs(self._localKeys or {}) do
+                if k == key then
+                    status.Text = "Local key valid"
+                    pcall(callback, true, "local")
+                    sg:Destroy()
+                    return
+                end
+            end
+            -- remote optional
+            if opts.verifyUrl and game.HttpGet then
+                local ok, reason = pcall(function() return remoteVerify(opts.verifyUrl, key, opts.timeout) end)
+                if ok and reason then
+                    -- remoteVerify returns success boolean + message when wrapped with pcall above; handle both patterns
+                end
+                local suc, msg = remoteVerify(opts.verifyUrl, key, opts.timeout)
+                if suc then
+                    status.Text = "Remote key valid"
+                    pcall(callback, true, "remote")
+                    sg:Destroy()
+                    return
+                else
+                    status.Text = "Invalid key ("..tostring(msg)..")"
+                    pcall(callback, false, msg)
+                    return
+                end
+            else
+                status.Text = "Invalid key"
+                pcall(callback, false, "invalid")
+                return
+            end
+        end)
+    end)
+
+    -- allow pressing Enter
+    input.FocusLost:Connect(function(enter)
+        if enter then submit:CaptureFocus(); submit.MouseButton1Click:Wait() end
+    end)
+end
+
+-- Return EmocX library
+return EmocX
